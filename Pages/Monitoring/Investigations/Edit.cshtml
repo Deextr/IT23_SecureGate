@@ -1,0 +1,33 @@
+@page "{alertId:long}"
+@model SecureGate1.Pages.Monitoring.Investigations.EditModel
+@{
+    ViewData["Title"] = "Investigation";
+}
+@if (Model.Alert is null)
+{
+    <p>That alert was not found.</p>
+}
+else
+{
+    <p class="sg-lede"><span class="sg-badge">@Model.Alert.Severity</span> @Model.Alert.Title · @Model.Alert.Status</p>
+    <form method="post" class="sg-card">
+        <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
+        <div class="sg-field">
+            <label class="sg-label" asp-for="Status">Status</label>
+            <select class="sg-select" asp-for="Status">
+                <option value="@InvestigationStatuses.Open">Open</option>
+                <option value="@InvestigationStatuses.InProgress">In progress</option>
+                <option value="@InvestigationStatuses.Closed">Closed</option>
+            </select>
+        </div>
+        <div class="sg-field">
+            <label class="sg-label" asp-for="Notes">Notes</label>
+            <textarea class="sg-textarea" asp-for="Notes" maxlength="2000" rows="6"></textarea>
+            <p class="sg-help">Up to 2000 characters. Stored and shown as text.</p>
+        </div>
+        <div class="sg-actions">
+            <button class="sg-btn" type="submit" data-submit>Save</button>
+            <a class="sg-btn-ghost" asp-page="Index">Back</a>
+        </div>
+    </form>
+}

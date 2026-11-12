@@ -1,0 +1,34 @@
+@page
+@model SecureGate1.Pages.Admin.Users.CreateModel
+@{
+    ViewData["Title"] = "New account";
+}
+<p class="sg-lede">The employee must change the temporary password and enroll an authenticator before protected pages open.</p>
+<form method="post" class="sg-card">
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
+    <div class="sg-field">
+        <label class="sg-label" asp-for="DisplayName">Display name</label>
+        <input class="sg-input" asp-for="DisplayName" maxlength="100" />
+    </div>
+    <div class="sg-field">
+        <label class="sg-label" asp-for="Email">Email</label>
+        <input class="sg-input" asp-for="Email" maxlength="254" autocomplete="off" />
+    </div>
+    <div class="sg-field">
+        <label class="sg-label" asp-for="Role">Role</label>
+        <select class="sg-select" asp-for="Role">
+            <option value="@Roles.Employee">Employee</option>
+            <option value="@Roles.SecurityOfficer">Security Officer</option>
+            <option value="@Roles.Administrator">Administrator</option>
+        </select>
+    </div>
+    <div class="sg-field">
+        <label class="sg-label" asp-for="Confirmation">Confirmation</label>
+        <input class="sg-input" asp-for="Confirmation" autocomplete="off" />
+        <p class="sg-help">Type CREATE ADMINISTRATOR when the role is Administrator.</p>
+    </div>
+    <div class="sg-actions">
+        <button class="sg-btn" type="submit" data-submit>Create</button>
+        <a class="sg-btn-ghost" asp-page="Index">Cancel</a>
+    </div>
+</form>

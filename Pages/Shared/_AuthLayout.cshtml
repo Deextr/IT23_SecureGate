@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SecureGate</title>
+    <partial name="_ThemeHead" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="auth-body">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="auth-toolbar">
+        <partial name="_ThemeToggle" />
+    </div>
+    <main id="main" class="auth-card" role="main">
+        <div class="sg-logo-auth-wrap">
+            <span class="sg-brand-mark">
+                <img src="~/brand/logo1_securegate.png" width="48" height="48" alt="" />
+            </span>
+            <span class="sg-brand-name">SecureGate</span>
+        </div>
+        @RenderBody()
+    </main>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

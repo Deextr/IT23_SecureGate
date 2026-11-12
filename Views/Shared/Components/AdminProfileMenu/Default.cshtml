@@ -1,0 +1,210 @@
+@model SecureGate1.Models.AdminProfileMenuModel
+@{
+    var openModal = TempData["OpenProfileModal"] is not null
+        || string.Equals(Context.Request.Query["profile"], "open", StringComparison.OrdinalIgnoreCase);
+}
+<div class="sg-profile-menu" data-profile-menu@(openModal ? " data-profile-open-on-load" : "")>
+    <button
+        class="sg-profile-trigger"
+        type="button"
+        id="sg-profile-trigger"
+        data-profile-toggle
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="sg-profile-dropdown">
+        @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+        {
+            <img class="sg-avatar sg-avatar-img" src="@Model.PhotoUrl" width="36" height="36" alt="" />
+        }
+        else
+        {
+            <span class="sg-avatar sg-avatar-initials" aria-hidden="true">@Model.Initials</span>
+        }
+        <span class="sg-profile-name">@Model.DisplayName</span>
+        <span class="sg-profile-chevron" aria-hidden="true"><vc:sg-icon name="chevron-down" /></span>
+    </button>
+    <div class="sg-profile-dropdown" id="sg-profile-dropdown" role="menu" aria-labelledby="sg-profile-trigger" hidden>
+        <button class="sg-profile-item" type="button" role="menuitem" data-profile-open>
+            <vc:sg-icon name="security" />
+            <span>Profile</span>
+        </button>
+        <form method="post" asp-page="/Account/Logout">
+            <button class="sg-profile-item sg-profile-item--danger" type="submit" role="menuitem">
+                <vc:sg-icon name="logout" />
+                <span>Sign out</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<dialog class="sg-modal sg-profile-modal" id="sg-profile-modal" aria-labelledby="sg-profile-modal-title">
+    <div class="sg-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-profile-modal-title">Account settings</h2>
+                <p class="sg-modal-subtitle">Manage how you appear and sign in to SecureGate.</p>
+            </div>
+            <button class="sg-modal-close" type="button" data-profile-close aria-label="Close account settings">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+
+        <div class="sg-modal-scroll">
+            @if (TempData["PasswordFormError"] is string pwdError)
+            {
+                <p class="sg-inline-alert sg-inline-alert--error" role="alert">@pwdError</p>
+            }
+
+            <div class="sg-profile-modal-layout">
+                <div class="sg-profile-modal-main">
+                    <form
+                        method="post"
+                        asp-page="/Account/Profile"
+                        asp-page-handler="Save"
+                        enctype="multipart/form-data"
+                        id="sg-profile-form"
+                        class="sg-profile-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                        <input type="checkbox" id="RemovePhoto" name="RemovePhoto" value="true" data-profile-remove hidden />
+
+                        <section class="sg-profile-block" aria-labelledby="sg-profile-account-heading">
+                            <h3 class="sg-section-heading" id="sg-profile-account-heading">Account information</h3>
+                            <p class="sg-section-lead">Update the name shown in the admin header and menus.</p>
+
+                            <div class="sg-field">
+                                <label class="sg-label" for="DisplayName">Display name</label>
+                                <input class="sg-input" id="DisplayName" name="DisplayName" value="@Model.DisplayName" maxlength="100" autocomplete="name" required />
+                            </div>
+                        </section>
+
+                        <section class="sg-profile-block sg-profile-block--tight" aria-labelledby="sg-profile-password-heading">
+                            <h4 class="sg-security-title" id="sg-profile-password-heading">Change password</h4>
+                            <p class="sg-help">Leave all fields blank to keep your current password.</p>
+
+                            @await Html.PartialAsync("_ModalPasswordField", new ViewDataDictionary(ViewData)
+                            {
+                                { "FieldId", "CurrentPassword" },
+                                { "FieldName", "CurrentPassword" },
+                                { "Label", "Current password" },
+                                { "Autocomplete", "current-password" }
+                            })
+                            @if (TempData["PasswordFieldError_CurrentPassword"] is string curErr)
+                            {
+                                <p class="sg-field-error" role="alert">@curErr</p>
+                            }
+                            @await Html.PartialAsync("_ModalPasswordField", new ViewDataDictionary(ViewData)
+                            {
+                                { "FieldId", "NewPassword" },
+                                { "FieldName", "NewPassword" },
+                                { "Label", "New password" },
+                                { "Autocomplete", "new-password" }
+                            })
+                            @if (TempData["PasswordFieldError_NewPassword"] is string newErr)
+                            {
+                                <p class="sg-field-error" role="alert">@newErr</p>
+                            }
+                            @await Html.PartialAsync("_ModalPasswordField", new ViewDataDictionary(ViewData)
+                            {
+                                { "FieldId", "ConfirmPassword" },
+                                { "FieldName", "ConfirmPassword" },
+                                { "Label", "Confirm new password" },
+                                { "Autocomplete", "new-password" }
+                            })
+                            @if (TempData["PasswordFieldError_ConfirmPassword"] is string confirmErr)
+                            {
+                                <p class="sg-field-error" role="alert">@confirmErr</p>
+                            }
+                        </section>
+
+                        <section class="sg-profile-block sg-profile-block--security" aria-labelledby="sg-profile-section-security">
+                            <h3 class="sg-section-heading" id="sg-profile-section-security">Security</h3>
+                            <p class="sg-section-lead">Password and recovery options for this account.</p>
+
+                            <div class="sg-security-meta" role="status">
+                                <div>
+                                    <span class="sg-security-meta-label">Authenticator</span>
+                                    <span class="sg-security-meta-value">@(Model.MfaEnrolled ? "Enrolled" : "Not enrolled")</span>
+                                </div>
+                                <div>
+                                    <span class="sg-security-meta-label">Unused recovery codes</span>
+                                    <span class="sg-security-meta-value">@Model.UnusedRecoveryCodes</span>
+                                </div>
+                            </div>
+
+                            <div class="sg-security-panel">
+                                <h4 class="sg-security-title">Recovery codes</h4>
+                                <p class="sg-help">One-time codes when your authenticator is unavailable. A new set replaces unused codes and is shown once.</p>
+                            </div>
+                        </section>
+
+                        <button class="sg-btn sg-btn--block sg-profile-save" type="submit" data-submit>Save profile</button>
+                    </form>
+
+                    <form method="post" asp-page="/Account/Security" asp-page-handler="Regenerate" class="sg-recovery-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                        <button class="sg-btn-secondary sg-btn--block" type="submit" data-submit@(Model.MfaEnrolled ? "" : " disabled")>
+                            Generate new recovery codes
+                        </button>
+                        @if (!Model.MfaEnrolled)
+                        {
+                            <p class="sg-help sg-help--tight">Enroll an authenticator before creating recovery codes.</p>
+                        }
+                    </form>
+                </div>
+
+                <aside class="sg-profile-modal-aside" aria-labelledby="sg-profile-photo-heading">
+                    <h3 class="sg-section-heading" id="sg-profile-photo-heading">Profile picture</h3>
+                    <p class="sg-section-lead">Shown next to your name across the portal.</p>
+
+                    <div class="sg-profile-photo-card" data-initials="@Model.Initials">
+                        <div class="sg-profile-modal-preview sg-profile-modal-preview--single">
+                            @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                            {
+                                <img
+                                    class="sg-avatar sg-avatar-img sg-avatar-xl sg-profile-preview-face"
+                                    id="sg-profile-preview-img"
+                                    src="@Model.PhotoUrl"
+                                    width="112"
+                                    height="112"
+                                    alt="" />
+                            }
+                            else
+                            {
+                                <span
+                                    class="sg-avatar sg-avatar-initials sg-avatar-xl sg-profile-preview-face"
+                                    id="sg-profile-preview-initials">@Model.Initials</span>
+                            }
+                        </div>
+                        <p class="sg-profile-aside-name" id="sg-profile-aside-name">@Model.DisplayName</p>
+                        <p class="sg-profile-aside-role">@Model.RoleLabel</p>
+                        <p class="sg-profile-aside-email">@Model.Email</p>
+
+                        <input
+                            class="sg-visually-hidden"
+                            id="Photo"
+                            name="Photo"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            form="sg-profile-form"
+                            data-profile-file />
+                        <div class="sg-profile-photo-actions">
+                            <button class="sg-btn-secondary sg-btn--compact" type="button" data-profile-upload-trigger>
+                                Upload picture
+                            </button>
+                            <button
+                                class="sg-profile-remove-link"
+                                type="button"
+                                data-profile-remove-trigger
+                                @(Model.HasPhoto ? null : "hidden")>
+                                Remove picture
+                            </button>
+                        </div>
+                        <p class="sg-help sg-help--center">JPEG, PNG, WebP, or GIF. Maximum 5 MB.</p>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+</dialog>

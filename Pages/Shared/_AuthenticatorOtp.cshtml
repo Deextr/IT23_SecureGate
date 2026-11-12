@@ -1,0 +1,30 @@
+@{
+    var label = (string)(ViewData["OtpLabel"] ?? "Authenticator code");
+    var value = (string)(ViewData["OtpValue"] ?? "");
+    var hideVisibleLabel = ViewData["OtpHideVisibleLabel"] is true;
+}
+<div class="sg-field@(hideVisibleLabel ? " sg-field--otp-only" : "")">
+    @if (hideVisibleLabel)
+    {
+        <span class="sg-visually-hidden" id="sg-otp-label">@label</span>
+    }
+    else
+    {
+        <span class="sg-label" id="sg-otp-label">@label</span>
+    }
+    <input class="sg-otp-value" type="hidden" id="Code" name="Code" value="@value" autocomplete="off" />
+    <div class="sg-otp" data-otp data-otp-target="Code" role="group" aria-labelledby="sg-otp-label">
+        @for (var i = 1; i <= 6; i++)
+        {
+            <input
+                class="sg-otp__box"
+                type="text"
+                inputmode="numeric"
+                maxlength="1"
+                pattern="[0-9]*"
+                autocomplete="@(i == 1 ? "one-time-code" : "off")"
+                aria-label="Digit @i of 6"
+                data-otp-index="@i" />
+        }
+    </div>
+</div>

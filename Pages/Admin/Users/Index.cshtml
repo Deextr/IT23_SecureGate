@@ -1,0 +1,377 @@
+@page
+@using System.Text.Json
+@using SecureGate1.Services
+@inject ProfilePhotoService ProfilePhotos
+@model SecureGate1.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "Accounts";
+    var openCreate = TempData["OpenCreateAdminModal"] is not null
+        || string.Equals(Request.Query["create"], "open", StringComparison.OrdinalIgnoreCase);
+    var openAccountId = TempData["OpenAccountId"] as string
+        ?? Model.Account
+        ?? Request.Query["account"].ToString();
+    if (string.IsNullOrEmpty(openAccountId))
+        openAccountId = null;
+}
+<p class="sg-lede">Administrators create every account. There is no public registration.</p>
+
+<div class="sg-accounts" data-admin-accounts data-actor-user-id="@Model.ActorUserId"@(Model.ActorIsSuperadmin ? " data-actor-is-superadmin" : "")@(openCreate ? " data-open-create-admin" : "")@(openAccountId is not null ? $" data-open-account-id=\"{openAccountId}\"" : "") data-role-superadmin="@Roles.Superadmin">
+    <div class="sg-accounts-toolbar">
+        <form method="get" class="sg-accounts-filters" id="sg-accounts-filter-form">
+            <div class="sg-accounts-search">
+                <span class="sg-accounts-search-icon" aria-hidden="true"><vc:sg-icon name="search" /></span>
+                <label class="sg-visually-hidden" for="search">Search</label>
+                <input
+                    class="sg-input sg-accounts-search-input"
+                    id="search"
+                    name="search"
+                    value="@Model.Search"
+                    maxlength="100"
+                    placeholder="Search"
+                    autocomplete="off" />
+            </div>
+            <select class="sg-select sg-accounts-filter" name="role" aria-label="Role" data-auto-submit>
+                <option value="" selected="@(string.IsNullOrEmpty(Model.RoleFilter))">All roles</option>
+                <option value="@Roles.Employee" selected="@(Model.RoleFilter == Roles.Employee)">Employee</option>
+                <option value="@Roles.SecurityOfficer" selected="@(Model.RoleFilter == Roles.SecurityOfficer)">Security Officer</option>
+                <option value="@Roles.Administrator" selected="@(Model.RoleFilter == Roles.Administrator)">Administrator</option>
+                <option value="@Roles.Superadmin" selected="@(Model.RoleFilter == Roles.Superadmin)">Superadmin</option>
+            </select>
+            <select class="sg-select sg-accounts-filter" name="status" aria-label="Status" data-auto-submit>
+                <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter))">All statuses</option>
+                <option value="active" selected="@(Model.StatusFilter == "active")">Active</option>
+                <option value="disabled" selected="@(Model.StatusFilter == "disabled")">Disabled</option>
+            </select>
+            <input type="hidden" name="pageNumber" value="1" />
+        </form>
+        <button class="sg-btn sg-accounts-create" type="button" data-create-admin-open>New account</button>
+    </div>
+
+    <div class="sg-accounts-card">
+        <div class="sg-table-wrap">
+            <table class="sg-table sg-accounts-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Users.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="sg-empty">No matching accounts.</td>
+                    </tr>
+                }
+                @foreach (var user in Model.Users)
+                {
+                    var roleKey = Model.Roles.TryGetValue(user.Id, out var role) ? role : "";
+                    var roleLabel = string.IsNullOrEmpty(roleKey) ? "None" : Roles.DisplayName(roleKey);
+                    var initials = ProfileAvatar.Initials(user.DisplayName);
+                    var photoUrl = ProfilePhotos.PublicUrl(user.ProfilePhotoPath);
+                    var accountJson = JsonSerializer.Serialize(new
+                    {
+                        id = user.Id,
+                        displayName = user.DisplayName,
+                        email = user.Email,
+                        role = roleLabel,
+                        roleKey,
+                        isActive = user.IsActive,
+                        mustChangePassword = user.MustChangePassword,
+                        createdAt = user.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt"),
+                        lastSignInAt = user.LastSignInAtUtc?.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt"),
+                        deactivatedAt = user.DeactivatedAtUtc?.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt"),
+                        photoUrl = photoUrl ?? "",
+                        initials
+                    });
+                    <tr
+                        class="sg-accounts-row"
+                        data-account-id="@user.Id"
+                        data-account="@accountJson"
+                        tabindex="0"
+                        role="button"
+                        aria-label="View details for @user.DisplayName"
+                        aria-haspopup="dialog">
+                        <td>
+                            <div class="sg-accounts-name-cell">
+                                @if (!string.IsNullOrEmpty(photoUrl))
+                                {
+                                    <img
+                                        class="sg-account-avatar sg-account-avatar-img"
+                                        src="@photoUrl"
+                                        width="38"
+                                        height="38"
+                                        alt=""
+                                        loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span class="sg-account-avatar sg-account-avatar-initials" aria-hidden="true">@initials</span>
+                                }
+                                <span class="sg-accounts-name">@user.DisplayName</span>
+                            </div>
+                        </td>
+                        <td class="sg-accounts-email">@user.Email</td>
+                        <td>@roleLabel</td>
+                        <td>
+                            @if (user.IsActive)
+                            {
+                                <span class="sg-badge sg-badge-good">Active</span>
+                            }
+                            else
+                            {
+                                <span class="sg-badge sg-badge-bad">Disabled</span>
+                            }
+                            @if (user.MustChangePassword)
+                            {
+                                <span class="sg-badge sg-badge-warn">Change password</span>
+                            }
+                        </td>
+                        <td class="sg-accounts-date">@user.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="sg-accounts-footer">
+            <p class="sg-accounts-range">
+                Showing @Model.RangeStart–@Model.RangeEnd of @Model.TotalCount results
+            </p>
+            <div class="sg-accounts-pager">
+                <span class="sg-accounts-page-size">Rows per page: @Model.PageSize</span>
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="sg-accounts-pages" aria-label="Pagination">
+                        @if (Model.PageNumber > 1)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-search="@Model.Search"
+                                asp-route-role="@Model.RoleFilter"
+                                asp-route-status="@Model.StatusFilter"
+                                asp-route-pageNumber="@(Model.PageNumber - 1)"
+                                aria-label="Previous page">‹</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">‹</span>
+                        }
+                        <span class="sg-accounts-page-btn is-current" aria-current="page">@Model.PageNumber</span>
+                        @if (Model.PageNumber < Model.TotalPages)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-search="@Model.Search"
+                                asp-route-role="@Model.RoleFilter"
+                                asp-route-status="@Model.StatusFilter"
+                                asp-route-pageNumber="@(Model.PageNumber + 1)"
+                                aria-label="Next page">›</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">›</span>
+                        }
+                    </nav>
+                }
+            </div>
+        </footer>
+    </div>
+</div>
+
+<dialog class="sg-modal sg-account-modal" id="sg-create-admin-modal" aria-labelledby="sg-create-admin-title">
+    <div class="sg-modal-card sg-account-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-create-admin-title">New account</h2>
+                <p class="sg-modal-subtitle">The employee must change the temporary password and enroll an authenticator before protected pages open.</p>
+            </div>
+            <button class="sg-modal-close" type="button" data-create-admin-close aria-label="Close">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll sg-account-modal-body">
+            @if (TempData["CreateAccountError"] is string createError)
+            {
+                <p class="sg-inline-alert sg-inline-alert--error" role="alert">@createError</p>
+            }
+            <form method="post" asp-page-handler="Create" class="sg-account-modal-form" id="sg-create-admin-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="search" value="@Model.Search" />
+                <input type="hidden" name="role" value="@Model.RoleFilter" />
+                <input type="hidden" name="status" value="@Model.StatusFilter" />
+                <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                <div class="sg-field">
+                    <label class="sg-label" for="CreateDisplayName">Display name</label>
+                    <input class="sg-input" id="CreateDisplayName" name="CreateDisplayName" maxlength="100" required />
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="CreateEmail">Email</label>
+                    <input class="sg-input" id="CreateEmail" name="CreateEmail" type="email" maxlength="254" autocomplete="off" required />
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="CreateRole">Role</label>
+                    <select class="sg-select" id="CreateRole" name="CreateRole">
+                        <option value="@Roles.Employee">Employee</option>
+                        <option value="@Roles.SecurityOfficer">Security Officer</option>
+                        <option value="@Roles.Administrator">Administrator</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="CreateConfirmation">Confirmation</label>
+                    <input class="sg-input" id="CreateConfirmation" name="CreateConfirmation" autocomplete="off" />
+                    <p class="sg-help">Type CREATE ADMINISTRATOR when the role is Administrator.</p>
+                </div>
+                <div class="sg-account-modal-actions">
+                    <button class="sg-btn-secondary" type="button" data-create-admin-close>Cancel</button>
+                    <button class="sg-btn" type="submit" data-submit>Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</dialog>
+
+<dialog class="sg-modal sg-user-details-modal" id="sg-user-details-modal" aria-labelledby="sg-user-details-title">
+    <div class="sg-modal-card sg-user-details-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings sg-user-details-header">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-user-details-title"></h2>
+            </div>
+            <button class="sg-modal-close" type="button" id="sg-user-details-close-btn" data-user-details-close aria-label="Close account details">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-user-details-tabs" role="tablist" aria-label="Account sections">
+            <button
+                class="sg-user-details-tab is-active"
+                type="button"
+                role="tab"
+                id="sg-user-details-tab-overview"
+                aria-selected="true"
+                aria-controls="sg-user-details-pane-overview"
+                data-user-details-tab="overview">
+                Overview
+            </button>
+            <button
+                class="sg-user-details-tab"
+                type="button"
+                role="tab"
+                id="sg-user-details-tab-manage"
+                aria-selected="false"
+                aria-controls="sg-user-details-pane-manage"
+                data-user-details-tab="manage"
+                tabindex="-1">
+                Manage
+            </button>
+        </div>
+        <div class="sg-modal-scroll sg-user-details-body">
+            <div
+                class="sg-user-details-pane is-active"
+                id="sg-user-details-pane-overview"
+                role="tabpanel"
+                aria-labelledby="sg-user-details-tab-overview"
+                tabindex="0">
+                <div class="sg-user-details-profile">
+                    <div class="sg-user-details-avatar-wrap" id="sg-user-details-avatar" aria-hidden="true"></div>
+                    <p class="sg-user-details-email" id="sg-user-details-email"></p>
+                    <div class="sg-user-details-badges" id="sg-user-details-badges"></div>
+                </div>
+                <ul class="sg-user-details-stats" id="sg-user-details-meta" aria-label="Account activity"></ul>
+                <p class="sg-user-details-hint" id="sg-user-details-manage-hint" data-user-details-manage-hint>Need to change role, access, or password? Open the <button type="button" class="sg-user-details-hint-link" data-user-details-tab-jump="manage">Manage</button> tab.</p>
+            </div>
+            <div
+                class="sg-user-details-pane"
+                id="sg-user-details-pane-manage"
+                role="tabpanel"
+                aria-labelledby="sg-user-details-tab-manage"
+                hidden
+                tabindex="0">
+                <ol class="sg-user-details-actions">
+                    <li class="sg-user-details-action">
+                        <div class="sg-user-details-action-copy">
+                            <h3 class="sg-user-details-action-title">Change role</h3>
+                            <p class="sg-user-details-action-lead">Sets what this person can do in SecureGate.</p>
+                        </div>
+                        <form method="post" asp-page-handler="Role" class="sg-user-details-action-form" id="sg-user-details-role-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="" data-user-details-field="id" />
+                            <input type="hidden" name="search" value="@Model.Search" />
+                            <input type="hidden" name="role" value="@Model.RoleFilter" />
+                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                            <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                            <label class="sg-label" for="sg-user-details-new-role">New role</label>
+                            <select class="sg-select" id="sg-user-details-new-role" name="newRole">
+                                <option value="@Roles.Employee">Employee</option>
+                                <option value="@Roles.SecurityOfficer">Security Officer</option>
+                                <option value="@Roles.Administrator">Administrator</option>
+                            </select>
+                            <label class="sg-label" for="sg-user-details-role-confirm">Confirmation</label>
+                            <input class="sg-input" id="sg-user-details-role-confirm" name="confirmation" placeholder="CHANGE ROLE" autocomplete="off" />
+                            <button class="sg-btn sg-user-details-action-btn" type="submit" data-submit>Apply role</button>
+                        </form>
+                    </li>
+                    <li class="sg-user-details-action" id="sg-user-details-disable-action" data-user-details-active-action="disable">
+                        <div class="sg-user-details-action-copy">
+                            <h3 class="sg-user-details-action-title">Disable account</h3>
+                            <p class="sg-user-details-action-lead">Stops sign-in until you reactivate this account.</p>
+                        </div>
+                        <form method="post" asp-page-handler="Status" class="sg-user-details-action-form" id="sg-user-details-disable-form" data-user-details-active-form="disable">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="" data-user-details-field="id" />
+                            <input type="hidden" name="search" value="@Model.Search" />
+                            <input type="hidden" name="role" value="@Model.RoleFilter" />
+                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                            <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                            <input type="hidden" name="active" value="false" />
+                            <label class="sg-label" for="sg-user-details-disable-confirm">Confirmation</label>
+                            <input class="sg-input" id="sg-user-details-disable-confirm" name="confirmation" placeholder="DISABLE" autocomplete="off" />
+                            <button class="sg-btn-danger sg-user-details-action-btn" type="submit" data-submit>Disable account</button>
+                        </form>
+                    </li>
+                    <li class="sg-user-details-action" id="sg-user-details-reactivate-action" data-user-details-active-action="reactivate" hidden>
+                        <div class="sg-user-details-action-copy">
+                            <h3 class="sg-user-details-action-title">Reactivate account</h3>
+                            <p class="sg-user-details-action-lead">Allows this person to sign in again.</p>
+                        </div>
+                        <form method="post" asp-page-handler="Status" class="sg-user-details-action-form" id="sg-user-details-reactivate-form" data-user-details-active-form="reactivate">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="" data-user-details-field="id" />
+                            <input type="hidden" name="search" value="@Model.Search" />
+                            <input type="hidden" name="role" value="@Model.RoleFilter" />
+                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                            <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                            <input type="hidden" name="active" value="true" />
+                            <label class="sg-label" for="sg-user-details-reactivate-confirm">Confirmation</label>
+                            <input class="sg-input" id="sg-user-details-reactivate-confirm" name="confirmation" placeholder="REACTIVATE" autocomplete="off" />
+                            <button class="sg-btn sg-user-details-action-btn" type="submit" data-submit>Reactivate account</button>
+                        </form>
+                    </li>
+                    <li class="sg-user-details-action sg-user-details-action--muted" id="sg-user-details-reset-action" data-user-details-reset-action>
+                        <div class="sg-user-details-action-copy">
+                            <h3 class="sg-user-details-action-title">Reset password</h3>
+                            <p class="sg-user-details-action-lead">Creates a temporary password. It appears once in the banner at the top of this page.</p>
+                        </div>
+                        <form method="post" asp-page-handler="ResetPassword" class="sg-user-details-action-form sg-user-details-action-form--solo" id="sg-user-details-reset-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="" data-user-details-field="id" />
+                            <input type="hidden" name="search" value="@Model.Search" />
+                            <input type="hidden" name="role" value="@Model.RoleFilter" />
+                            <input type="hidden" name="status" value="@Model.StatusFilter" />
+                            <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                            <button class="sg-btn-secondary sg-user-details-action-btn" type="submit" data-submit>Issue temporary password</button>
+                        </form>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script src="~/js/admin-accounts.js" asp-append-version="true"></script>
+}

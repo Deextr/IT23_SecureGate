@@ -1,0 +1,19 @@
+@page
+@model SecureGate1.Pages.Account.VerifyMfaModel
+@{
+    ViewData["Title"] = "Authenticator code";
+    Layout = "_AuthLayout";
+    ViewData["OtpValue"] = Model.Code;
+    ViewData["OtpHideVisibleLabel"] = true;
+}
+<h1>Authenticator code</h1>
+<p class="sg-help">Enter the current 6-digit code for SecureGate.</p>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+}
+<form method="post" class="auth-form">
+    <partial name="_AuthenticatorOtp" />
+    <button class="sg-btn" type="submit" data-submit>Verify</button>
+</form>
+<p><a asp-page="RecoveryCodeSignIn">Use a recovery code</a></p>

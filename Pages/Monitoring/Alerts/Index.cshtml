@@ -1,0 +1,48 @@
+@page
+@model SecureGate1.Pages.Monitoring.Alerts.IndexModel
+@{
+    ViewData["Title"] = "Alerts";
+}
+<form method="get" class="sg-toolbar">
+    <div class="sg-field">
+        <label class="sg-label" for="status">Status</label>
+        <select class="sg-select" id="status" name="status">
+            <option value="">Open and acknowledged</option>
+            <option value="Open" selected="@(Model.Status == "Open")">Open</option>
+            <option value="Acknowledged" selected="@(Model.Status == "Acknowledged")">Acknowledged</option>
+            <option value="Resolved" selected="@(Model.Status == "Resolved")">Resolved</option>
+        </select>
+    </div>
+    <button class="sg-btn" type="submit">Filter</button>
+</form>
+@if (Model.Alerts.Count == 0)
+{
+    <p class="sg-empty">No matching alerts.</p>
+}
+else
+{
+    <div class="sg-table-wrap">
+        <table class="sg-table">
+            <thead><tr><th>When (UTC)</th><th>Alert</th><th>Severity</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var alert in Model.Alerts)
+            {
+                <tr>
+                    <td>@alert.CreatedAtUtc.ToString("u")</td>
+                    <td>@alert.Title</td>
+                    <td><span class="sg-badge">@alert.Severity</span></td>
+                    <td>@alert.Status</td>
+                    <td class="sg-actions">
+                        @if (alert.Status != AlertStatuses.Resolved)
+                        {
+                            <form method="post" asp-page-handler="Acknowledge"><input type="hidden" name="id" value="@alert.AlertId" /><button class="sg-btn-ghost" type="submit">Acknowledge</button></form>
+                            <form method="post" asp-page-handler="Resolve"><input type="hidden" name="id" value="@alert.AlertId" /><button class="sg-btn" type="submit">Resolve</button></form>
+                        }
+                        <a class="sg-btn-ghost" asp-page="/Monitoring/Investigations/Edit" asp-route-alertId="@alert.AlertId">Investigate</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

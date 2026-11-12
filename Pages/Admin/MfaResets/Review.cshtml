@@ -1,0 +1,45 @@
+@page "{id:long}"
+@model SecureGate1.Pages.Admin.MfaResets.ReviewModel
+@{
+    ViewData["Title"] = "Review request";
+}
+@if (Model.RequestItem is null)
+{
+    <p>That request was not found.</p>
+}
+else
+{
+    <p class="sg-lede">@Model.RequestItem.TargetUser.DisplayName (@Model.RequestItem.TargetUser.Email) · @Model.RequestItem.Status</p>
+    <section class="sg-card">
+        <p>Verification: @VerificationMethods.DisplayName(Model.RequestItem.VerificationMethod)</p>
+        <p>Notes: @Model.RequestItem.Notes</p>
+        @if (!string.IsNullOrEmpty(Model.RequestItem.DecisionNotes))
+        {
+            <p>Decision: @Model.RequestItem.DecisionNotes</p>
+        }
+    </section>
+    @if (Model.RequestItem.Status == ResetRequestStatuses.Pending)
+    {
+        <form method="post" asp-page-handler="Approve" class="sg-card">
+            <h2>Approve</h2>
+            <p class="sg-help">This revokes the authenticator, unused recovery codes, and active sessions. An administrator account needs a different administrator.</p>
+            <div class="sg-field">
+                <label class="sg-label" for="decisionNotes">Decision notes</label>
+                <textarea class="sg-textarea" id="decisionNotes" name="decisionNotes" maxlength="2000" rows="3"></textarea>
+            </div>
+            <div class="sg-field">
+                <label class="sg-label" for="confirmation">Type APPROVE RESET</label>
+                <input class="sg-input" id="confirmation" name="confirmation" autocomplete="off" />
+            </div>
+            <button class="sg-btn" type="submit" data-submit>Approve</button>
+        </form>
+        <form method="post" asp-page-handler="Reject" class="sg-card">
+            <h2>Reject</h2>
+            <div class="sg-field">
+                <label class="sg-label" for="rejectNotes">Reason</label>
+                <textarea class="sg-textarea" id="rejectNotes" name="decisionNotes" maxlength="2000" rows="3"></textarea>
+            </div>
+            <button class="sg-btn-danger" type="submit" data-submit>Reject</button>
+        </form>
+    }
+}

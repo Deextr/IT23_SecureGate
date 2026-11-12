@@ -1,0 +1,13 @@
+﻿@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Something went wrong";
+    Layout = "_AuthLayout";
+}
+<h1>Something went wrong</h1>
+<p>SecureGate could not finish that request. Details were recorded on the server.</p>
+@if (Model.ShowRequestId)
+{
+    <p>Reference: <code>@Model.RequestId</code></p>
+}
+<p><a asp-page="/Account/Login">Sign in</a></p>

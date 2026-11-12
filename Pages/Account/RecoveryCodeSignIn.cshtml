@@ -1,0 +1,20 @@
+@page
+@model SecureGate1.Pages.Account.RecoveryCodeSignInModel
+@{
+    ViewData["Title"] = "Recovery code";
+    Layout = "_AuthLayout";
+}
+<h1>Recovery code</h1>
+<p class="sg-help">Each code works once. This does not turn off your authenticator.</p>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+}
+<form method="post" class="auth-form">
+    <div class="sg-field">
+        <label class="sg-label" asp-for="Code">Code</label>
+        <input class="sg-input" asp-for="Code" autocomplete="one-time-code" maxlength="32" />
+    </div>
+    <button class="sg-btn" type="submit" data-submit>Continue</button>
+</form>
+<p><a asp-page="VerifyMfa">Use authenticator instead</a></p>

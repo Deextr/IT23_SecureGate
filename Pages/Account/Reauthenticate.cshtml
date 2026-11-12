@@ -1,0 +1,17 @@
+@page
+@model SecureGate1.Pages.Account.ReauthenticateModel
+@{
+    ViewData["Title"] = "Confirm it's you";
+    ViewData["OtpLabel"] = "Authenticator code";
+    ViewData["OtpValue"] = Model.Code;
+}
+<p class="sg-lede">This action needs a fresh authenticator code.</p>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+}
+<form method="post" class="sg-card">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <partial name="_AuthenticatorOtp" />
+    <button class="sg-btn" type="submit" data-submit>Confirm</button>
+</form>

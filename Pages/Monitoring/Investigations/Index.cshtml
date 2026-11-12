@@ -1,0 +1,27 @@
+@page
+@model SecureGate1.Pages.Monitoring.Investigations.IndexModel
+@{
+    ViewData["Title"] = "Investigations";
+}
+@if (Model.Records.Count == 0)
+{
+    <p class="sg-empty">No investigations yet. Open an alert and choose Investigate.</p>
+}
+else
+{
+    <div class="sg-table-wrap">
+        <table class="sg-table">
+            <thead><tr><th>Updated (UTC)</th><th>Alert</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var record in Model.Records)
+            {
+                <tr>
+                    <td><a asp-page="Edit" asp-route-alertId="@record.AlertId">@record.UpdatedAtUtc.ToString("u")</a></td>
+                    <td>@record.Alert.Title</td>
+                    <td>@record.Status</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

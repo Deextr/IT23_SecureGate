@@ -1,0 +1,11 @@
+﻿@page
+@model PrivacyModel
+@{
+    ViewData["Title"] = "Privacy";
+    Layout = "_AuthLayout";
+}
+<h1>Privacy</h1>
+<p>SecureGate stores employee account details, authenticator enrollment status, and authentication activity so DavaoTech Solutions can investigate unauthorized access.</p>
+<p>Passwords and recovery codes are stored only as protected hashes. Authenticator secrets are encrypted. Sign-in pages do not say whether an email address is registered.</p>
+<p>Audit records are kept for at least one year and are not edited or deleted through the application.</p>
+<p><a asp-page="/Account/Login">Sign in</a></p>

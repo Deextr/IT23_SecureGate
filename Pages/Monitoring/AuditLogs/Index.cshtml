@@ -1,0 +1,68 @@
+@page
+@model SecureGate1.Pages.Monitoring.AuditLogs.IndexModel
+@{
+    ViewData["Title"] = "Audit log";
+}
+<p class="sg-lede">Times are UTC. Rows cannot be edited here. CSV export is for administrators only.</p>
+<form method="get" class="filter-bar sg-card">
+    <div class="sg-field"><label class="sg-label" for="from">From</label><input class="sg-input" id="from" type="date" name="from" value="@Model.From" /></div>
+    <div class="sg-field"><label class="sg-label" for="to">To</label><input class="sg-input" id="to" type="date" name="to" value="@Model.To" /></div>
+    <div class="sg-field"><label class="sg-label" for="eventType">Event</label><input class="sg-input" id="eventType" name="eventType" value="@Model.EventType" maxlength="64" /></div>
+    <div class="sg-field"><label class="sg-label" for="outcome">Outcome</label>
+        <select class="sg-select" id="outcome" name="outcome">
+            <option value="">Any</option>
+            <option value="Success" selected="@(Model.Outcome == "Success")">Success</option>
+            <option value="Failure" selected="@(Model.Outcome == "Failure")">Failure</option>
+            <option value="Denied" selected="@(Model.Outcome == "Denied")">Denied</option>
+        </select>
+    </div>
+    <div class="sg-field"><label class="sg-label" for="severity">Severity</label><input class="sg-input" id="severity" name="severity" value="@Model.Severity" maxlength="20" /></div>
+    <div class="sg-field"><label class="sg-label" for="account">Account</label><input class="sg-input" id="account" name="account" value="@Model.Account" maxlength="254" /></div>
+    <div class="sg-field"><label class="sg-label" for="pageSize">Rows</label><input class="sg-input" id="pageSize" name="pageSize" value="@Model.PageSize" /></div>
+    <div class="sg-actions">
+        <button class="sg-btn" type="submit">Filter</button>
+        @if (User.IsInRole(Roles.Superadmin) || User.IsInRole(Roles.Administrator))
+        {
+            <a class="sg-btn-secondary" asp-page="Index" asp-page-handler="Export" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account">Export CSV</a>
+        }
+    </div>
+</form>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+}
+<div class="sg-table-wrap">
+    <table class="sg-table">
+        <thead><tr><th>When (UTC)</th><th>Event</th><th>Outcome</th><th>Severity</th><th>Account</th></tr></thead>
+        <tbody>
+        @if (Model.Results.Items.Count == 0)
+        {
+            <tr><td colspan="5" class="sg-empty">No matching events.</td></tr>
+        }
+        @foreach (var item in Model.Results.Items)
+        {
+            <tr>
+                <td><a asp-page="Details" asp-route-id="@item.EventId">@item.OccurredAtUtc.ToString("u")</a></td>
+                <td>@item.EventType</td>
+                <td>@item.Outcome</td>
+                <td><span class="sg-badge">@item.Severity</span></td>
+                <td>@(item.SubjectIdentifier ?? item.TargetUserId ?? "Unknown")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+@if (Model.Results.TotalPages > 1)
+{
+    <p class="sg-actions">
+        @if (Model.PageNumber > 1)
+        {
+            <a class="sg-btn-ghost" asp-page="Index" asp-route-pageNumber="@(Model.PageNumber - 1)" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account" asp-route-pageSize="@Model.PageSize">Previous</a>
+        }
+        <span>Page @Model.PageNumber of @Model.Results.TotalPages (@Model.Results.Total events)</span>
+        @if (Model.PageNumber < Model.Results.TotalPages)
+        {
+            <a class="sg-btn-ghost" asp-page="Index" asp-route-pageNumber="@(Model.PageNumber + 1)" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account" asp-route-pageSize="@Model.PageSize">Next</a>
+        }
+    </p>
+}

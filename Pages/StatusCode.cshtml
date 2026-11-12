@@ -1,0 +1,9 @@
+@page "{code:int}"
+@model StatusCodeModel
+@{
+    ViewData["Title"] = "Page not available";
+    Layout = "_AuthLayout";
+}
+<h1>Page not available</h1>
+<p>That page does not exist, or it cannot be shown. Reference: @Model.Code</p>
+<p><a asp-page="/Account/Login">Sign in</a></p>

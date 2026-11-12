@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+appsettings.*.local.json
+secrets.json
+TestResults/
+.dotnet/
+*.nupkg
+AppData/uploads/**/*
+!AppData/uploads/profiles/.gitkeep

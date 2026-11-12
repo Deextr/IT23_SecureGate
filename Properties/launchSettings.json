@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7101;http://localhost:5238",
+      "environmentVariables": {
+        "ASPNETCORE_HTTPS_PORT": "7101",
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5238",
+      "environmentVariables": {
+        "ASPNETCORE_HTTPS_PORT": "7101",
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

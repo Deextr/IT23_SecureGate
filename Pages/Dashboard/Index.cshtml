@@ -1,0 +1,64 @@
+@page
+@model SecureGate1.Pages.Dashboard.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+<p class="sg-lede">Hello, @Model.DisplayName · @Model.RoleName</p>
+<div class="sg-grid sg-grid-3">
+    <section class="sg-stat-card is-accent">
+        <p class="sg-help">Active accounts</p>
+        <p class="sg-stat">@Model.Summary.ActiveUsers</p>
+    </section>
+    <section class="sg-stat-card">
+        <p class="sg-help">Open alerts</p>
+        <p class="sg-stat">@Model.Summary.OpenAlerts</p>
+    </section>
+    <section class="sg-stat-card">
+        <p class="sg-help">Failed passwords today</p>
+        <p class="sg-stat">@Model.Summary.FailedPasswordsToday</p>
+    </section>
+</div>
+<div class="sg-grid sg-grid-2">
+    <section class="sg-card">
+        <h2>Recent activity</h2>
+        @if (Model.Summary.RecentEvents.Count == 0)
+        {
+            <p class="sg-empty">No events yet.</p>
+        }
+        else
+        {
+            <div class="sg-table-wrap">
+                <table class="sg-table">
+                    <thead><tr><th>When (UTC)</th><th>Event</th><th>Outcome</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model.Summary.RecentEvents)
+                    {
+                        <tr>
+                            <td>@item.OccurredAtUtc.ToString("u")</td>
+                            <td>@item.EventType</td>
+                            <td>@item.Outcome</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+    <section class="sg-card">
+        <h2>Open alerts</h2>
+        @if (Model.Summary.OpenAlertList.Count == 0)
+        {
+            <p class="sg-empty">No open alerts.</p>
+        }
+        else
+        {
+            <ul class="sg-alert-list">
+                @foreach (var alert in Model.Summary.OpenAlertList)
+                {
+                    <li><span class="sg-badge">@alert.Severity</span> @alert.Title</li>
+                }
+            </ul>
+        }
+        <p class="sg-help">Pending recovery: @Model.Summary.PendingResets. Disabled accounts: @Model.Summary.DisabledUsers.</p>
+    </section>
+</div>

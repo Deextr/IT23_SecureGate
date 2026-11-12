@@ -1,0 +1,22 @@
+@page
+@model SecureGate1.Pages.Account.EnrollAuthenticatorModel
+@{
+    ViewData["Title"] = "Set up authenticator";
+    Layout = "_AuthLayout";
+    ViewData["OtpLabel"] = "Authenticator code";
+    ViewData["OtpValue"] = Model.Code;
+}
+<h1>Set up authenticator</h1>
+<p class="sg-help">Scan the code, or type the key, then enter the 6-digit code. MFA stays off until that code is accepted.</p>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+}
+<img class="sg-qr" src="@Model.QrDataUri" alt="QR code for authenticator setup" />
+<p class="sg-help">Manual key</p>
+<p class="sg-secret">@Model.ManualKey</p>
+<form method="post" class="auth-form">
+    <input type="hidden" asp-for="ProtectedPayload" />
+    <partial name="_AuthenticatorOtp" />
+    <button class="sg-btn" type="submit" data-submit>Confirm</button>
+</form>

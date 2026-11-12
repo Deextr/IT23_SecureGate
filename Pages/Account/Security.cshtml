@@ -1,0 +1,34 @@
+@page
+@model SecureGate1.Pages.Account.SecurityModel
+@{
+    ViewData["Title"] = "Profile";
+}
+<p class="sg-lede">Authenticator: <strong>@(Model.Enrolled ? "Enrolled" : "Not enrolled")</strong>. Unused recovery codes: <strong>@Model.UnusedCodes</strong>.</p>
+<div class="sg-grid sg-grid-2">
+    <section class="sg-card">
+        <h2>Password</h2>
+        <form method="post" asp-page-handler="Password">
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
+            <div class="sg-field">
+                <label class="sg-label" asp-for="CurrentPassword">Current password</label>
+                <input class="sg-input" asp-for="CurrentPassword" autocomplete="current-password" />
+            </div>
+            <div class="sg-field">
+                <label class="sg-label" asp-for="NewPassword">New password</label>
+                <input class="sg-input" asp-for="NewPassword" autocomplete="new-password" />
+            </div>
+            <div class="sg-field">
+                <label class="sg-label" asp-for="ConfirmPassword">Confirm password</label>
+                <input class="sg-input" asp-for="ConfirmPassword" autocomplete="new-password" />
+            </div>
+            <button class="sg-btn" type="submit" data-submit>Save password</button>
+        </form>
+    </section>
+    <section class="sg-card">
+        <h2>Recovery codes</h2>
+        <p class="sg-help">A new set replaces every unused code and is shown once.</p>
+        <form method="post" asp-page-handler="Regenerate">
+            <button class="sg-btn-secondary" type="submit" data-submit>New codes</button>
+        </form>
+    </section>
+</div>

@@ -1,0 +1,9 @@
+@page
+@model SecureGate1.Pages.Account.LockoutModel
+@{
+    ViewData["Title"] = "Temporarily unavailable";
+    Layout = "_AuthLayout";
+}
+<h1>Temporarily unavailable</h1>
+<p>Too many unsuccessful password attempts. Wait about 15 minutes, then try again.</p>
+<p><a asp-page="Login">Sign in</a></p>

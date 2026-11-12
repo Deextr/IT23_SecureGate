@@ -1,0 +1,29 @@
+@page
+@model SecureGate1.Pages.Account.RecoveryCodesModel
+@{
+    ViewData["Title"] = "Recovery codes";
+    Layout = "_AuthLayout";
+}
+<h1>Save recovery codes</h1>
+@if (Model.Missing)
+{
+    <p>These codes are no longer on screen and cannot be shown again. Sign in with your authenticator, then create a new set from Security.</p>
+}
+else
+{
+    <p class="sg-help">Store these somewhere only you can open. Each code works once.</p>
+    <ul class="sg-code-list">
+        @foreach (var code in Model.Codes)
+        {
+            <li>@code</li>
+        }
+    </ul>
+}
+<form method="post" class="auth-form" novalidate>
+    <div class="sg-field sg-check">
+        <input asp-for="Acknowledged" />
+        <label asp-for="Acknowledged">I saved these codes, or I understand they are no longer displayed.</label>
+    </div>
+    <span asp-validation-for="Acknowledged" class="field-validation-error"></span>
+    <button class="sg-btn" type="submit" data-submit>Continue</button>
+</form>

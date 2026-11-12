@@ -1,0 +1,29 @@
+@page
+@model SecureGate1.Pages.Admin.Settings.IndexModel
+@{
+    ViewData["Title"] = "Settings";
+}
+<p class="sg-lede">These values apply to new sign-in attempts. Session length, password length, and the network rate limit are server configuration and read-only here.</p>
+<section class="sg-card">
+    <p>Password length: @Model.Policy.PasswordMinLength–@Model.Policy.PasswordMaxLength characters.</p>
+    <p>Session: @Model.Policy.SessionIdleMinutes min idle, or @Model.Policy.SessionAbsoluteHours hours total.</p>
+    <p>Network: @Model.Policy.IpPermitLimit requests / @Model.Policy.IpWindowMinutes min per address.</p>
+    <p>Audit retention: at least @Model.Input.AuditRetentionDays days. The app does not delete or edit rows.</p>
+</section>
+<form method="post" class="sg-card">
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
+    <input type="hidden" asp-for="RowVersion" />
+    <div class="sg-grid sg-grid-3">
+        <div class="sg-field"><label class="sg-label" asp-for="Input.LockoutFailedAttempts">Lockout after</label><input class="sg-input" asp-for="Input.LockoutFailedAttempts" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.LockoutMinutes">Lockout minutes</label><input class="sg-input" asp-for="Input.LockoutMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.StepUpMinutes">Fresh MFA window</label><input class="sg-input" asp-for="Input.StepUpMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpFailureLimit">Authenticator failures</label><input class="sg-input" asp-for="Input.TotpFailureLimit" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpFailureWindowMinutes">Authenticator window</label><input class="sg-input" asp-for="Input.TotpFailureWindowMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpCooldownMinutes">Authenticator cooldown</label><input class="sg-input" asp-for="Input.TotpCooldownMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryFailureLimit">Recovery failures</label><input class="sg-input" asp-for="Input.RecoveryFailureLimit" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryFailureWindowMinutes">Recovery window</label><input class="sg-input" asp-for="Input.RecoveryFailureWindowMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryCooldownMinutes">Recovery cooldown</label><input class="sg-input" asp-for="Input.RecoveryCooldownMinutes" /></div>
+        <div class="sg-field"><label class="sg-label" asp-for="Input.AuditRetentionDays">Audit retention days</label><input class="sg-input" asp-for="Input.AuditRetentionDays" /></div>
+    </div>
+    <button class="sg-btn" type="submit" data-submit>Save</button>
+</form>

@@ -1,0 +1,29 @@
+@page
+@model SecureGate1.Pages.Admin.MfaResets.IndexModel
+@{
+    ViewData["Title"] = "Recovery";
+}
+<p class="sg-lede">Approve only after identity was checked in person or through a separate organization process.</p>
+@if (Model.Requests.Count == 0)
+{
+    <p class="sg-empty">No recovery requests.</p>
+}
+else
+{
+    <div class="sg-table-wrap">
+        <table class="sg-table">
+            <thead><tr><th>When (UTC)</th><th>Employee</th><th>Status</th><th>Method</th></tr></thead>
+            <tbody>
+            @foreach (var request in Model.Requests)
+            {
+                <tr>
+                    <td>@request.CreatedAtUtc.ToString("u")</td>
+                    <td><a asp-page="Review" asp-route-id="@request.MfaResetRequestId">@request.TargetUser.DisplayName (@request.TargetUser.Email)</a></td>
+                    <td>@request.Status</td>
+                    <td>@VerificationMethods.DisplayName(request.VerificationMethod)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

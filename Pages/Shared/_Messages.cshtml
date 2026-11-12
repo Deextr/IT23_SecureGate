@@ -1,0 +1,20 @@
+@if (TempData["Success"] is string success)
+{
+    <div class="sg-banner sg-banner-success" role="status">@success</div>
+}
+@if (TempData["Error"] is string errorMessage)
+{
+    <div class="sg-banner sg-banner-error" role="alert">@errorMessage</div>
+}
+@if (TempData["RecoveryNotice"] is string notice)
+{
+    <div class="sg-banner sg-banner-warning" role="status">@notice</div>
+}
+@if (TempData["TemporaryPassword"] is string temporaryPassword)
+{
+    <div class="sg-banner sg-banner-warning" role="status">
+        <p><strong>Temporary password, shown once:</strong></p>
+        <p class="sg-secret">@temporaryPassword</p>
+        <p>Give this to the employee in person or through a channel you already trust. Do not send it to an email account that may be compromised. They must change it at first sign-in.</p>
+    </div>
+}

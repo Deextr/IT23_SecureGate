@@ -1,0 +1,92 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SecureGate</title>
+    <partial name="_ThemeHead" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="sg-app">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="sg-nav-scrim" data-nav-scrim hidden></div>
+    <aside class="sg-sidebar" id="sg-sidebar" data-sidebar>
+        <a class="sg-brand-lockup" asp-page="/Dashboard/Index">
+            <span class="sg-brand-mark">
+                <img src="~/brand/logo1_securegate.png" width="44" height="44" alt="" />
+            </span>
+            <span class="sg-brand-name">SecureGate</span>
+        </a>
+        <nav class="sg-nav" aria-label="Modules">
+            <p class="sg-nav-label">Workspace</p>
+            <a class="sg-nav-link" asp-page="/Dashboard/Index">
+                <vc:sg-icon name="dashboard" />
+                <span>Dashboard</span>
+            </a>
+            @if (User.IsInRole(Roles.Superadmin) || User.IsInRole(Roles.Administrator))
+            {
+                <p class="sg-nav-label">Administration</p>
+                <a class="sg-nav-link" asp-page="/Admin/Users/Index">
+                    <vc:sg-icon name="users" />
+                    <span>Accounts</span>
+                </a>
+                <a class="sg-nav-link" asp-page="/Admin/MfaResets/Index">
+                    <vc:sg-icon name="reset" />
+                    <span>Recovery</span>
+                </a>
+                <a class="sg-nav-link" asp-page="/Admin/Settings/Index">
+                    <vc:sg-icon name="settings" />
+                    <span>Settings</span>
+                </a>
+            }
+            @if (User.IsInRole(Roles.Superadmin) || User.IsInRole(Roles.Administrator) || User.IsInRole(Roles.SecurityOfficer))
+            {
+                <p class="sg-nav-label">Monitoring</p>
+                <a class="sg-nav-link" asp-page="/Monitoring/AuditLogs/Index">
+                    <vc:sg-icon name="audit" />
+                    <span>Audit log</span>
+                </a>
+                <a class="sg-nav-link" asp-page="/Monitoring/Alerts/Index">
+                    <vc:sg-icon name="alerts" />
+                    <span>Alerts</span>
+                </a>
+                <a class="sg-nav-link" asp-page="/Monitoring/Investigations/Index">
+                    <vc:sg-icon name="investigate" />
+                    <span>Investigations</span>
+                </a>
+                <a class="sg-nav-link" asp-page="/MfaResets/Request">
+                    <vc:sg-icon name="reset" />
+                    <span>Request reset</span>
+                </a>
+            }
+        </nav>
+    </aside>
+    <div class="sg-frame">
+        <header class="sg-topbar">
+            <button class="sg-icon-btn" type="button" data-nav-toggle aria-controls="sg-sidebar" aria-expanded="false" aria-label="Open menu">
+                <vc:sg-icon name="menu" />
+            </button>
+            <div class="sg-topbar-copy">
+                <p class="sg-crumb">SecureGate</p>
+                <h1 class="sg-topbar-title">@ViewData["Title"]</h1>
+            </div>
+            <div class="sg-topbar-actions">
+                <partial name="_ThemeToggle" />
+                @await Component.InvokeAsync("AdminProfileMenu")
+            </div>
+        </header>
+        <div class="sg-shell">
+            <partial name="_Messages" />
+            <main id="main" role="main">
+                @RenderBody()
+            </main>
+            <footer class="sg-footer">DavaoTech Solutions, Inc. Sign-in activity is recorded.</footer>
+        </div>
+    </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

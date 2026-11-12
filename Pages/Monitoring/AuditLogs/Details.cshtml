@@ -1,0 +1,24 @@
+@page "{id:long}"
+@model SecureGate1.Pages.Monitoring.AuditLogs.DetailsModel
+@{
+    ViewData["Title"] = Model.Event?.EventType ?? "Event";
+}
+@if (Model.Event is null)
+{
+    <p>That event was not found.</p>
+}
+else
+{
+    <dl class="sg-card sg-meta">
+        <dt>When (UTC)</dt><dd>@Model.Event.OccurredAtUtc.ToString("u")</dd>
+        <dt>Outcome</dt><dd>@Model.Event.Outcome</dd>
+        <dt>Severity</dt><dd>@Model.Event.Severity</dd>
+        <dt>Actor</dt><dd>@(Model.Event.ActorUserId ?? "Unknown")</dd>
+        <dt>Target</dt><dd>@(Model.Event.TargetUserId ?? "None")</dd>
+        <dt>Submitted name</dt><dd>@(Model.Event.SubjectIdentifier ?? "None")</dd>
+        <dt>IP address</dt><dd>@(Model.Event.IpAddress ?? "None")</dd>
+        <dt>Correlation</dt><dd>@(Model.Event.CorrelationId ?? "None")</dd>
+        <dt>Details</dt><dd>@(Model.Event.Details ?? "None")</dd>
+    </dl>
+    <p><a class="sg-btn-ghost" asp-page="Index">Back</a></p>
+}
