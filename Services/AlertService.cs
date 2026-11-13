@@ -75,11 +75,25 @@ public class AlertService
         if (alert.Status == AlertStatuses.Resolved)
             return ServiceResult.Ok("Alert is already resolved.");
 
+        var now = _time.GetUtcNow().UtcDateTime;
         alert.Status = AlertStatuses.Resolved;
-        alert.ResolvedAtUtc = _time.GetUtcNow().UtcDateTime;
+        alert.ResolvedAtUtc = now;
         alert.ResolvedById = officerId;
         alert.ResponsibleOfficerId ??= officerId;
+
+        var investigationClosed = false;
+        var investigation = await db.InvestigationRecords.SingleOrDefaultAsync(i => i.AlertId == alertId, cancellationToken);
+        if (investigation is not null && investigation.Status != InvestigationStatuses.Closed)
+        {
+            investigation.Status = InvestigationStatuses.Closed;
+            investigation.UpdatedAtUtc = now;
+            investigation.ClosedAtUtc = now;
+            investigationClosed = true;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
-        return ServiceResult.Ok("Alert resolved.");
+        return ServiceResult.Ok(investigationClosed
+            ? "Alert resolved and the investigation was closed."
+            : "Alert resolved.");
     }
 }

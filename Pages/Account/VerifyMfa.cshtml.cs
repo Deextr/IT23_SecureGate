@@ -37,6 +37,12 @@ public class VerifyMfaModel : PageModel
             return RedirectToPage("Login");
 
         var result = await _mfa.VerifyAsync(user, Code, cancellationToken);
+        if (result.RequiresAuthenticatorReset)
+        {
+            await _completion.IssuePreAuthAsync(user, PreAuthStages.Enroll);
+            return RedirectToPage("EnrollAuthenticator");
+        }
+
         if (!result.Succeeded)
         {
             Error = result.Message;

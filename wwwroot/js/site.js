@@ -334,4 +334,27 @@
     };
 
     document.querySelectorAll("[data-otp]").forEach(bindOtp);
+
+    const stepUpModal = document.getElementById("sg-step-up-modal");
+    if (stepUpModal) {
+        const locked = stepUpModal.hasAttribute("data-step-up-lock");
+        const focusOtp = () => {
+            const first = stepUpModal.querySelector(".sg-otp__box");
+            first?.focus();
+        };
+        const openStepUp = () => {
+            if (typeof stepUpModal.showModal !== "function" || stepUpModal.open) return;
+            stepUpModal.showModal();
+            window.setTimeout(focusOtp, 0);
+        };
+        if (stepUpModal.hasAttribute("data-step-up-required")) openStepUp();
+
+        stepUpModal.addEventListener("cancel", (event) => {
+            if (locked) event.preventDefault();
+        });
+
+        stepUpModal.addEventListener("click", (event) => {
+            if (locked && event.target === stepUpModal) event.preventDefault();
+        });
+    }
 })();

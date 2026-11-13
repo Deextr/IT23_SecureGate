@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using SecureGate1.Data;
 using SecureGate1.Models;
 
 namespace SecureGate1.Services;
@@ -9,25 +7,25 @@ public class AuthenticationFlowService
 {
     private readonly UserManager<ApplicationUser> _users;
     private readonly IPasswordHasher<ApplicationUser> _hasher;
-    private readonly ApplicationDbContext _db;
     private readonly AuditService _audit;
     private readonly SettingsService _settings;
+    private readonly MfaService _mfa;
     private readonly TimeProvider _time;
     private readonly string _dummyHash;
 
     public AuthenticationFlowService(
         UserManager<ApplicationUser> users,
         IPasswordHasher<ApplicationUser> hasher,
-        ApplicationDbContext db,
         AuditService audit,
         SettingsService settings,
+        MfaService mfa,
         TimeProvider time)
     {
         _users = users;
         _hasher = hasher;
-        _db = db;
         _audit = audit;
         _settings = settings;
+        _mfa = mfa;
         _time = time;
         _dummyHash = hasher.HashPassword(new ApplicationUser(), "timing-only-value");
     }
@@ -150,9 +148,7 @@ public class AuthenticationFlowService
         if (user.MustChangePassword)
             return new PasswordSignInResult { Stage = PasswordStage.ChangePassword, UserId = user.Id };
 
-        var enrolled = await _db.UserMfaSettings.AsNoTracking().AnyAsync(
-            s => s.UserId == user.Id && s.IsEnabled && s.ProtectedSecret != null,
-            cancellationToken);
+        var enrolled = await _mfa.HasUsableAuthenticatorAsync(user.Id, cancellationToken);
         return new PasswordSignInResult
         {
             Stage = enrolled ? PasswordStage.Verify : PasswordStage.Enroll,

@@ -1,0 +1,45 @@
+@model SecureGate1.Services.EmployeeDashboardDto
+<div class="sg-dash-split sg-dash-split--employee">
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">Your account</h2>
+        <dl class="sg-dash-summary sg-dash-summary--profile">
+            <div><dt>Name</dt><dd data-text="displayName">@Model.DisplayName</dd></div>
+            <div><dt>Email</dt><dd data-text="email">@Model.Email</dd></div>
+            <div><dt>Role</dt><dd data-text="roleName">@Model.RoleName</dd></div>
+            <div><dt>Status</dt><dd data-text="accountStatus">@Model.AccountStatus</dd></div>
+            <div><dt>Authenticator</dt><dd data-text="authenticator">@Model.Authenticator</dd></div>
+            <div><dt>Last sign-in</dt><dd data-text="lastSignIn">@Model.LastSignIn</dd></div>
+        </dl>
+        <div class="sg-dash-actions">
+            <a class="sg-btn sg-btn--compact" asp-page="/Dashboard/Index" asp-route-profile="open">Profile</a>
+            <a class="sg-btn-secondary sg-btn--compact" asp-page="/Account/Security">Security</a>
+        </div>
+    </section>
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">In this period</h2>
+        <dl class="sg-dash-summary">
+            <div><dt>Your events</dt><dd data-kpi="personalEventsInRange">@Model.PersonalEventsInRange</dd></div>
+            <div><dt>Account notices</dt><dd data-kpi="openPersonalAlerts">@Model.OpenPersonalAlerts</dd></div>
+            <div><dt>Recovery requests</dt><dd data-kpi="pendingRequests">@Model.PendingRequests</dd></div>
+        </dl>
+        @if (Model.PendingRequests > 0 || Model.OpenPersonalAlerts > 0)
+        {
+            <ul class="sg-dash-attention">
+                @if (Model.PendingRequests > 0)
+                {
+                    <li><span class="sg-dash-attention-static is-highlight">Pending recovery under review</span></li>
+                }
+                @if (Model.OpenPersonalAlerts > 0)
+                {
+                    <li><span class="sg-dash-attention-static is-highlight"><span data-kpi="openPersonalAlerts">@Model.OpenPersonalAlerts</span> open notice@(Model.OpenPersonalAlerts == 1 ? "" : "s") about your account</span></li>
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+<section class="sg-card sg-dash-panel sg-dash-panel-wide">
+    <h2 class="sg-dash-section-title">Recent activity</h2>
+    <div data-list="recentActivity"></div>
+    <noscript>@await Html.PartialAsync("_DashboardFeedStatic", Model.RecentActivity)</noscript>
+</section>

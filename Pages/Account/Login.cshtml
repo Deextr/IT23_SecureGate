@@ -1,11 +1,19 @@
 @page
 @model SecureGate1.Pages.Account.LoginModel
+@using SecureGate1.Services
 @{
     ViewData["Title"] = "Sign in";
     Layout = "_AuthLayout";
 }
 <h1 class="auth-title-center">Sign in</h1>
-@if (!string.IsNullOrEmpty(Model.Error))
+@if (Model.ShowLockout)
+{
+    <div class="sg-banner sg-banner-error" role="alert">
+        <p><strong>@SignInMessages.LockoutTitle</strong></p>
+        <p>@SignInMessages.LockoutBody</p>
+    </div>
+}
+else if (!string.IsNullOrEmpty(Model.Error))
 {
     <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
 }

@@ -1,0 +1,81 @@
+@model SecureGate1.Services.AdminDashboardDto
+<div class="sg-dash-metrics" aria-label="Overview">
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Active accounts</h3>
+        <p class="sg-dash-metric-value" data-kpi="activeAccounts">@Model.ActiveAccounts</p>
+        <p class="sg-dash-metric-caption"><span data-kpi="totalAccounts">@Model.TotalAccounts</span> total · <span data-kpi="disabledAccounts">@Model.DisabledAccounts</span> disabled</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Audit activity</h3>
+        <p class="sg-dash-metric-value" data-kpi="auditEventsInRange">@Model.AuditEventsInRange</p>
+        <p class="sg-dash-metric-caption">Events in selected range</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Open alerts</h3>
+        <p class="sg-dash-metric-value" data-kpi="openAlerts">@Model.OpenAlerts</p>
+        <p class="sg-dash-metric-caption"><span data-kpi="alertsInRange">@Model.AlertsInRange</span> new in range</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Pending recovery</h3>
+        <p class="sg-dash-metric-value" data-kpi="pendingRecovery">@Model.PendingRecovery</p>
+        <p class="sg-dash-metric-caption">Awaiting administrator review</p>
+    </article>
+</div>
+
+<section class="sg-card sg-dash-hero-chart">
+    <h2 class="sg-dash-section-title">System activity</h2>
+    <p class="sg-dash-section-hint">Audit log volume for the selected range</p>
+    <div class="sg-dash-chart-frame" data-chart-empty="activityTrend">
+        <canvas data-chart="activityTrend" data-chart-type="line" width="960" height="280" aria-label="System activity trend"></canvas>
+    </div>
+</section>
+
+<div class="sg-dash-split">
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">In this period</h2>
+        <dl class="sg-dash-summary">
+            <div><dt>Accounts created</dt><dd data-kpi="accountsCreatedInRange">@Model.AccountsCreatedInRange</dd></div>
+            <div><dt>Security alerts</dt><dd data-kpi="alertsInRange">@Model.AlertsInRange</dd></div>
+            <div><dt>Ongoing investigations</dt><dd data-kpi="ongoingInvestigations">@Model.OngoingInvestigations</dd></div>
+            <div><dt>Administrators</dt><dd data-kpi="administrators">@Model.Administrators</dd></div>
+            <div><dt>Security officers</dt><dd data-kpi="securityOfficers">@Model.SecurityOfficers</dd></div>
+            <div><dt>Employees</dt><dd data-kpi="employees">@Model.Employees</dd></div>
+        </dl>
+    </section>
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">Needs attention</h2>
+        <p class="sg-dash-section-hint">Current backlog</p>
+        <ul class="sg-dash-attention">
+            <li>
+                <a class="sg-dash-attention-link@(Model.OpenAlerts > 0 ? " is-highlight" : "")" asp-page="/Monitoring/SecurityOperations/Index">
+                    <span>Open alerts</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="openAlerts">@Model.OpenAlerts</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+            <li>
+                <a class="sg-dash-attention-link@(Model.PendingRecovery > 0 ? " is-highlight" : "")" asp-page="/Admin/MfaResets/Index">
+                    <span>Recovery requests</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="pendingRecovery">@Model.PendingRecovery</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+            <li>
+                <a class="sg-dash-attention-link@(Model.OngoingInvestigations > 0 ? " is-highlight" : "")" asp-page="/Monitoring/SecurityOperations/Index" asp-route-section="investigations">
+                    <span>Investigations</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="ongoingInvestigations">@Model.OngoingInvestigations</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+            <li>
+                <a class="sg-dash-attention-link" asp-page="/Monitoring/AuditLogs/Index">
+                    <span>Audit logs</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+        </ul>
+    </section>
+</div>
+
+<section class="sg-card sg-dash-panel sg-dash-panel-wide">
+    <h2 class="sg-dash-section-title">Recent activity</h2>
+    <div data-list="recentAudit"></div>
+    <noscript>@await Html.PartialAsync("_DashboardFeedStatic", Model.RecentAudit)</noscript>
+</section>

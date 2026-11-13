@@ -76,6 +76,19 @@ public class AuditService
         return filtered.Length <= max ? filtered : filtered[..max];
     }
 
+    public static string? CleanMultiline(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var filtered = new string(value
+            .Where(c => c is '\n' or '\r' or '\t' || !char.IsControl(c))
+            .ToArray()).Trim();
+        if (filtered.Length == 0)
+            return null;
+        return filtered.Length <= max ? filtered : filtered[..max];
+    }
+
     private static string? Truncate(string? value, int max) =>
         string.IsNullOrEmpty(value) ? value : (value.Length <= max ? value : value[..max]);
 }

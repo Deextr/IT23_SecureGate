@@ -24,34 +24,9 @@ public class IndexModel : PageModel
     public IReadOnlyList<SecurityAlert> Alerts { get; private set; } = [];
     public string? Status { get; private set; }
 
-    public async Task OnGetAsync(string? status, CancellationToken cancellationToken)
+    public IActionResult OnGet(string? status)
     {
-        Status = status;
-        var query = _db.SecurityAlerts.AsNoTracking().AsQueryable();
-        if (string.IsNullOrWhiteSpace(status))
-            query = query.Where(a => a.Status != AlertStatuses.Resolved);
-        else if (status is AlertStatuses.Open or AlertStatuses.Acknowledged or AlertStatuses.Resolved)
-            query = query.Where(a => a.Status == status);
-        Alerts = await query.OrderByDescending(a => a.AlertId).Take(100).ToListAsync(cancellationToken);
-    }
-
-    public async Task<IActionResult> OnPostAcknowledgeAsync(long id, CancellationToken cancellationToken)
-    {
-        var officerId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var result = await _alerts.AcknowledgeAsync(id, officerId, cancellationToken);
-        if (result.Succeeded)
-        {
-            await _audit.WriteAsync(new AuditWrite
-            {
-                EventType = EventTypes.AlertAcknowledged,
-                Outcome = Outcomes.Success,
-                ActorUserId = officerId,
-                Details = $"Alert={id}"
-            }, cancellationToken);
-        }
-
-        TempData[result.Succeeded ? "Success" : "Error"] = result.Message;
-        return RedirectToPage();
+        return RedirectToPage("/Monitoring/SecurityOperations/Index", new { status = status == AlertStatuses.Acknowledged ? AlertStatuses.Open : status });
     }
 
     public async Task<IActionResult> OnPostResolveAsync(long id, CancellationToken cancellationToken)

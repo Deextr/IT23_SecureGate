@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<publishData>
+  <publishProfile
+    profileName="YOUR_SITE-WebDeploy"
+    publishMethod="MSDeploy"
+    publishUrl="siteXXXXXX.siteasp.net"
+    msdeploySite="siteXXXXXX"
+    userName="siteXXXXXX"
+    userPWD="YOUR_WEB_DEPLOY_PASSWORD"
+    destinationAppUrl="http://your-app.runasp.net/"
+    />
+</publishData>

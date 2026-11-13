@@ -3,29 +3,4 @@
 @{
     ViewData["Title"] = "Request reset";
 }
-<p class="sg-lede">Use this when an employee lost both the authenticator and recovery codes. An administrator still has to approve.</p>
-<form method="post" class="sg-card">
-    <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
-    <div class="sg-field">
-        <label class="sg-label" asp-for="TargetUserId">Employee</label>
-        <select class="sg-select" asp-for="TargetUserId">
-            @foreach (var user in Model.Employees)
-            {
-                <option value="@user.Id">@user.DisplayName (@user.Email)</option>
-            }
-        </select>
-    </div>
-    <div class="sg-field">
-        <label class="sg-label" asp-for="VerificationMethod">Identity check</label>
-        <select class="sg-select" asp-for="VerificationMethod">
-            <option value="@VerificationMethods.InPerson">In person</option>
-            <option value="@VerificationMethods.OrganizationRecord">Organization record</option>
-            <option value="@VerificationMethods.ManagerConfirmation">Manager confirmation</option>
-        </select>
-    </div>
-    <div class="sg-field">
-        <label class="sg-label" asp-for="Notes">What you checked</label>
-        <textarea class="sg-textarea" asp-for="Notes" maxlength="2000" rows="4"></textarea>
-    </div>
-    <button class="sg-btn" type="submit" data-submit>Submit</button>
-</form>
+<p class="sg-lede">Redirecting…</p>

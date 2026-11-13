@@ -30,7 +30,15 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnGetAsync(long alertId, CancellationToken cancellationToken)
     {
         await LoadAsync(alertId, cancellationToken);
-        return Alert is null ? NotFound() : Page();
+        if (Alert is null)
+            return NotFound();
+        if (Alert.Status == AlertStatuses.Resolved)
+        {
+            TempData["Error"] = "This alert is resolved. Investigations cannot be opened or changed.";
+            return RedirectToPage("/Monitoring/SecurityOperations/Index");
+        }
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync(long alertId, CancellationToken cancellationToken)

@@ -2,28 +2,340 @@
 @model SecureGate1.Pages.Admin.Settings.IndexModel
 @{
     ViewData["Title"] = "Settings";
+    var activePane = string.IsNullOrWhiteSpace(Model.Section) ? "overview" : Model.Section.Trim().ToLowerInvariant();
+    var allowedSections = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "overview", "server", "signin", "authenticator", "recovery", "admin", "audit"
+    };
+    if (!allowedSections.Contains(activePane))
+        activePane = "overview";
 }
-<p class="sg-lede">These values apply to new sign-in attempts. Session length, password length, and the network rate limit are server configuration and read-only here.</p>
-<section class="sg-card">
-    <p>Password length: @Model.Policy.PasswordMinLength–@Model.Policy.PasswordMaxLength characters.</p>
-    <p>Session: @Model.Policy.SessionIdleMinutes min idle, or @Model.Policy.SessionAbsoluteHours hours total.</p>
-    <p>Network: @Model.Policy.IpPermitLimit requests / @Model.Policy.IpWindowMinutes min per address.</p>
-    <p>Audit retention: at least @Model.Input.AuditRetentionDays days. The app does not delete or edit rows.</p>
-</section>
-<form method="post" class="sg-card">
-    <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
-    <input type="hidden" asp-for="RowVersion" />
-    <div class="sg-grid sg-grid-3">
-        <div class="sg-field"><label class="sg-label" asp-for="Input.LockoutFailedAttempts">Lockout after</label><input class="sg-input" asp-for="Input.LockoutFailedAttempts" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.LockoutMinutes">Lockout minutes</label><input class="sg-input" asp-for="Input.LockoutMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.StepUpMinutes">Fresh MFA window</label><input class="sg-input" asp-for="Input.StepUpMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpFailureLimit">Authenticator failures</label><input class="sg-input" asp-for="Input.TotpFailureLimit" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpFailureWindowMinutes">Authenticator window</label><input class="sg-input" asp-for="Input.TotpFailureWindowMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.TotpCooldownMinutes">Authenticator cooldown</label><input class="sg-input" asp-for="Input.TotpCooldownMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryFailureLimit">Recovery failures</label><input class="sg-input" asp-for="Input.RecoveryFailureLimit" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryFailureWindowMinutes">Recovery window</label><input class="sg-input" asp-for="Input.RecoveryFailureWindowMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.RecoveryCooldownMinutes">Recovery cooldown</label><input class="sg-input" asp-for="Input.RecoveryCooldownMinutes" /></div>
-        <div class="sg-field"><label class="sg-label" asp-for="Input.AuditRetentionDays">Audit retention days</label><input class="sg-input" asp-for="Input.AuditRetentionDays" /></div>
+@if (Model.RequiresStepUp)
+{
+    <partial name="_StepUpModal" model="Model.StepUpModal" />
+}
+else
+{
+    <p class="sg-lede">
+        Control organization-wide security limits that apply on the next sign-in or verification attempt.
+        Values under <strong>Server baseline</strong> are fixed in deployment configuration and cannot be changed here.
+    </p>
+
+    <div class="sg-settings" id="sg-settings-panel" data-admin-settings data-initial-section="@activePane">
+        <div class="sg-settings-layout">
+            <nav class="sg-settings-nav" aria-label="Settings categories">
+                <p class="sg-settings-nav-label">Categories</p>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="overview" aria-current="@(activePane == "overview" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Overview</span>
+                    <span class="sg-settings-nav-desc">What you can change</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="server" aria-current="@(activePane == "server" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Server baseline</span>
+                    <span class="sg-settings-nav-desc">Read-only deployment values</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="signin" aria-current="@(activePane == "signin" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Sign-in protection</span>
+                    <span class="sg-settings-nav-desc">Password lockout</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="authenticator" aria-current="@(activePane == "authenticator" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Authenticator</span>
+                    <span class="sg-settings-nav-desc">MFA attempt limits</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="recovery" aria-current="@(activePane == "recovery" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Recovery</span>
+                    <span class="sg-settings-nav-desc">Recovery code limits</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="admin" aria-current="@(activePane == "admin" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Administrator access</span>
+                    <span class="sg-settings-nav-desc">Step-up identity check</span>
+                </button>
+                <button type="button" class="sg-settings-nav-link" data-settings-nav="audit" aria-current="@(activePane == "audit" ? "page" : null)">
+                    <span class="sg-settings-nav-title">Audit &amp; retention</span>
+                    <span class="sg-settings-nav-desc">Compliance minimum</span>
+                </button>
+            </nav>
+
+            <div class="sg-settings-content">
+                <form method="post" class="sg-settings-form" id="sg-settings-form" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="validation-summary-errors" role="alert"></div>
+                    <input type="hidden" asp-for="RowVersion" />
+                    <input type="hidden" asp-for="Section" id="sg-settings-section" />
+
+                    <section class="sg-settings-pane" data-settings-pane="overview" @(activePane != "overview" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Overview</h2>
+                            <p class="sg-settings-pane-lead">
+                                SecureGate stores editable limits in the database (singleton <code class="sg-code-inline">SecuritySettings</code>).
+                                They take effect for new activity immediately after you save. Changing them is audited at high severity.
+                            </p>
+                        </header>
+
+                        @if (Model.Input.UpdatedAtUtc != default)
+                        {
+                            <p class="sg-settings-meta">
+                                Last saved
+                                <time datetime="@Model.Input.UpdatedAtUtc.ToString("o")">@SecureGate1.Services.DisplayTime.Local(Model.Input.UpdatedAtUtc)</time>
+                                @if (!string.IsNullOrEmpty(Model.LastUpdatedByName))
+                                {
+                                    <span>by @Model.LastUpdatedByName</span>
+                                }
+                            </p>
+                        }
+
+                        <div class="sg-settings-summary-grid">
+                            <article class="sg-settings-summary-card">
+                                <h3 class="sg-settings-summary-title">Sign-in protection</h3>
+                                <p class="sg-settings-summary-value">@Model.Input.LockoutFailedAttempts failed attempts · @Model.Input.LockoutMinutes min lockout</p>
+                                <p class="sg-help">Applies when someone enters the wrong password.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="signin">Edit sign-in protection</button>
+                            </article>
+                            <article class="sg-settings-summary-card">
+                                <h3 class="sg-settings-summary-title">Authenticator limits</h3>
+                                <p class="sg-settings-summary-value">@Model.Input.TotpFailureLimit failures / @Model.Input.TotpFailureWindowMinutes min · @Model.Input.TotpCooldownMinutes min cooldown</p>
+                                <p class="sg-help">Limits repeated wrong MFA codes at sign-in.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="authenticator">Edit authenticator limits</button>
+                            </article>
+                            <article class="sg-settings-summary-card">
+                                <h3 class="sg-settings-summary-title">Recovery limits</h3>
+                                <p class="sg-settings-summary-value">@Model.Input.RecoveryFailureLimit failures / @Model.Input.RecoveryFailureWindowMinutes min · @Model.Input.RecoveryCooldownMinutes min cooldown</p>
+                                <p class="sg-help">Limits repeated wrong recovery codes.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="recovery">Edit recovery limits</button>
+                            </article>
+                            <article class="sg-settings-summary-card">
+                                <h3 class="sg-settings-summary-title">Administrator step-up</h3>
+                                <p class="sg-settings-summary-value">@Model.Input.StepUpMinutes minutes</p>
+                                <p class="sg-help">How long MFA confirmation lasts before sensitive admin actions.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="admin">Edit step-up window</button>
+                            </article>
+                            <article class="sg-settings-summary-card">
+                                <h3 class="sg-settings-summary-title">Audit retention</h3>
+                                <p class="sg-settings-summary-value">@Model.Input.AuditRetentionDays days minimum</p>
+                                <p class="sg-help">Minimum retention policy; the application does not delete audit rows automatically.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="audit">Edit retention</button>
+                            </article>
+                            <article class="sg-settings-summary-card sg-settings-summary-card--muted">
+                                <h3 class="sg-settings-summary-title">Server baseline</h3>
+                                <p class="sg-settings-summary-value">Password @Model.Policy.PasswordMinLength–@Model.Policy.PasswordMaxLength chars · Session @Model.Policy.SessionIdleMinutes min idle</p>
+                                <p class="sg-help">Configured in <code class="sg-code-inline">appsettings</code> (SecurityPolicy). Requires redeploy to change.</p>
+                                <button type="button" class="sg-settings-summary-jump" data-settings-nav-jump="server">View server baseline</button>
+                            </article>
+                        </div>
+
+                        <aside class="sg-settings-callout" role="note">
+                            <p class="sg-settings-callout-title">Before you save</p>
+                            <p class="sg-help">You must confirm your identity with MFA (step-up). Stricter limits may lock out users until cooldowns expire. All saves are recorded in the audit log.</p>
+                        </aside>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="server" @(activePane != "server" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Server baseline</h2>
+                            <p class="sg-settings-pane-lead">
+                                These values come from the <strong>SecurityPolicy</strong> section in application configuration.
+                                They define password rules, session lifetime, rate limiting, and other platform defaults. They are read-only on this page.
+                            </p>
+                        </header>
+
+                        <div class="sg-settings-readonly-group">
+                            <h3 class="sg-settings-group-title">Passwords &amp; sessions</h3>
+                            <dl class="sg-settings-dl">
+                                <div class="sg-settings-dl-row">
+                                    <dt>Password length</dt>
+                                    <dd>@Model.Policy.PasswordMinLength–@Model.Policy.PasswordMaxLength characters</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Session idle timeout</dt>
+                                    <dd>@Model.Policy.SessionIdleMinutes minutes of inactivity</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Maximum session length</dt>
+                                    <dd>@Model.Policy.SessionAbsoluteHours hours total</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Pre-authentication window</dt>
+                                    <dd>@Model.Policy.PreAuthMinutes minutes to complete MFA after password</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <div class="sg-settings-readonly-group">
+                            <h3 class="sg-settings-group-title">Network protection</h3>
+                            <dl class="sg-settings-dl">
+                                <div class="sg-settings-dl-row">
+                                    <dt>Per-IP rate limit</dt>
+                                    <dd>@Model.Policy.IpPermitLimit requests per @Model.Policy.IpWindowMinutes minutes per address</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Maximum request body</dt>
+                                    <dd>@(Model.Policy.MaxRequestBodyBytes / 1024) KB</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <div class="sg-settings-readonly-group">
+                            <h3 class="sg-settings-group-title">Authenticator standard</h3>
+                            <dl class="sg-settings-dl">
+                                <div class="sg-settings-dl-row">
+                                    <dt>TOTP format</dt>
+                                    <dd>@Model.Policy.TotpDigits digits, @Model.Policy.TotpPeriodSeconds second period</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Clock drift tolerance</dt>
+                                    <dd>@Model.Policy.TotpDriftSteps step(s)</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Recovery codes issued</dt>
+                                    <dd>@Model.Policy.RecoveryCodeCount codes per regeneration</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <div class="sg-settings-readonly-group">
+                            <h3 class="sg-settings-group-title">Monitoring &amp; UI</h3>
+                            <dl class="sg-settings-dl">
+                                <div class="sg-settings-dl-row">
+                                    <dt>Default page size</dt>
+                                    <dd>@Model.Policy.PageSize rows (max @Model.Policy.MaxPageSize)</dd>
+                                </div>
+                                <div class="sg-settings-dl-row">
+                                    <dt>Audit search range</dt>
+                                    <dd>Up to @Model.Policy.MaxAuditRangeDays days</dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="signin" @(activePane != "signin" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Sign-in protection</h2>
+                            <p class="sg-settings-pane-lead">
+                                Controls how many wrong passwords are allowed before an account is temporarily locked.
+                            </p>
+                        </header>
+                        <div class="sg-settings-fields">
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.LockoutFailedAttempts">Failed password attempts before lockout</label>
+                                <input class="sg-input" asp-for="Input.LockoutFailedAttempts" type="number" min="3" max="20" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 3–20. Counts consecutive failed password attempts for a user.</p>
+                                <span asp-validation-for="Input.LockoutFailedAttempts" class="field-validation-error"></span>
+                            </div>
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.LockoutMinutes">Lockout duration (minutes)</label>
+                                <input class="sg-input" asp-for="Input.LockoutMinutes" type="number" min="1" max="1440" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–1440. The account cannot sign in until this period ends.</p>
+                                <span asp-validation-for="Input.LockoutMinutes" class="field-validation-error"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="authenticator" @(activePane != "authenticator" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Authenticator limits</h2>
+                            <p class="sg-settings-pane-lead">
+                                Limits how often someone can enter a wrong authenticator code during sign-in or verification before a cooldown applies.
+                            </p>
+                        </header>
+                        <div class="sg-settings-fields">
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.TotpFailureLimit">Maximum wrong codes</label>
+                                <input class="sg-input" asp-for="Input.TotpFailureLimit" type="number" min="3" max="20" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 3–20 failures within the window below.</p>
+                                <span asp-validation-for="Input.TotpFailureLimit" class="field-validation-error"></span>
+                            </div>
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.TotpFailureWindowMinutes">Counting window (minutes)</label>
+                                <input class="sg-input" asp-for="Input.TotpFailureWindowMinutes" type="number" min="1" max="60" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–60. Failures older than this window are not counted.</p>
+                                <span asp-validation-for="Input.TotpFailureWindowMinutes" class="field-validation-error"></span>
+                            </div>
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.TotpCooldownMinutes">Cooldown after limit (minutes)</label>
+                                <input class="sg-input" asp-for="Input.TotpCooldownMinutes" type="number" min="1" max="1440" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–1440. Further MFA attempts are blocked until this ends.</p>
+                                <span asp-validation-for="Input.TotpCooldownMinutes" class="field-validation-error"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="recovery" @(activePane != "recovery" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Recovery code limits</h2>
+                            <p class="sg-settings-pane-lead">
+                                Same pattern as authenticator limits, but for recovery codes used when MFA is unavailable.
+                            </p>
+                        </header>
+                        <div class="sg-settings-fields">
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.RecoveryFailureLimit">Maximum wrong recovery codes</label>
+                                <input class="sg-input" asp-for="Input.RecoveryFailureLimit" type="number" min="3" max="20" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 3–20 failures within the window below.</p>
+                                <span asp-validation-for="Input.RecoveryFailureLimit" class="field-validation-error"></span>
+                            </div>
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.RecoveryFailureWindowMinutes">Counting window (minutes)</label>
+                                <input class="sg-input" asp-for="Input.RecoveryFailureWindowMinutes" type="number" min="1" max="60" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–60.</p>
+                                <span asp-validation-for="Input.RecoveryFailureWindowMinutes" class="field-validation-error"></span>
+                            </div>
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.RecoveryCooldownMinutes">Cooldown after limit (minutes)</label>
+                                <input class="sg-input" asp-for="Input.RecoveryCooldownMinutes" type="number" min="1" max="1440" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–1440.</p>
+                                <span asp-validation-for="Input.RecoveryCooldownMinutes" class="field-validation-error"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="admin" @(activePane != "admin" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Administrator access</h2>
+                            <p class="sg-settings-pane-lead">
+                                After you verify MFA, sensitive administrator actions (including saving these settings) stay trusted for a limited time.
+                            </p>
+                        </header>
+                        <div class="sg-settings-fields">
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.StepUpMinutes">Fresh MFA window (minutes)</label>
+                                <input class="sg-input" asp-for="Input.StepUpMinutes" type="number" min="1" max="30" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 1–30. When this expires, you must enter your authenticator code again.</p>
+                                <span asp-validation-for="Input.StepUpMinutes" class="field-validation-error"></span>
+                            </div>
+                        </div>
+                        <aside class="sg-settings-callout sg-settings-callout--warn" role="note">
+                            <p class="sg-settings-callout-title">Security impact</p>
+                            <p class="sg-help">A longer window is more convenient but keeps elevated trust active longer on this device.</p>
+                        </aside>
+                    </section>
+
+                    <section class="sg-settings-pane" data-settings-pane="audit" @(activePane != "audit" ? "hidden" : null)>
+                        <header class="sg-settings-pane-header">
+                            <h2 class="sg-settings-pane-title">Audit &amp; retention</h2>
+                            <p class="sg-settings-pane-lead">
+                                Sets the minimum number of days audit events must be retained for compliance. SecureGate does not automatically purge audit rows from this page.
+                            </p>
+                        </header>
+                        <div class="sg-settings-fields">
+                            <div class="sg-settings-field">
+                                <label class="sg-label" asp-for="Input.AuditRetentionDays">Minimum retention (days)</label>
+                                <input class="sg-input" asp-for="Input.AuditRetentionDays" type="number" min="365" max="3650" step="1" inputmode="numeric" data-settings-input />
+                                <p class="sg-help">Allowed range: 365–3650 (one to ten years). Used for policy and monitoring expectations.</p>
+                                <span asp-validation-for="Input.AuditRetentionDays" class="field-validation-error"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <footer class="sg-settings-form-footer" data-settings-footer hidden>
+                        <p class="sg-settings-dirty-note" data-settings-dirty-note hidden>You have unsaved changes.</p>
+                        <div class="sg-settings-form-actions">
+                            <button class="sg-btn" type="submit" data-submit data-settings-save>Save security settings</button>
+                        </div>
+                    </footer>
+                </form>
+            </div>
+        </div>
     </div>
-    <button class="sg-btn" type="submit" data-submit>Save</button>
-</form>
+
+    @section Scripts {
+        <script src="~/js/admin-settings.js" asp-append-version="true"></script>
+    }
+}

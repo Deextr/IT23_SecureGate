@@ -4,9 +4,12 @@ public class ServiceResult
 {
     public bool Succeeded { get; init; }
     public string Message { get; init; } = "";
+    public bool RequiresAuthenticatorReset { get; init; }
 
     public static ServiceResult Ok(string message = "") => new() { Succeeded = true, Message = message };
     public static ServiceResult Fail(string message) => new() { Succeeded = false, Message = message };
+    public static ServiceResult FailReset(string message) =>
+        new() { Succeeded = false, Message = message, RequiresAuthenticatorReset = true };
 }
 
 public sealed class CreateUserResult : ServiceResult

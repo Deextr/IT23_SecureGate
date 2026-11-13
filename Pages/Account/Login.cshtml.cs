@@ -38,6 +38,8 @@ public class LoginModel : PageModel
 
     public string? Error { get; private set; }
 
+    public bool ShowLockout { get; private set; }
+
     public IActionResult OnGet()
     {
         if (User.Identity?.IsAuthenticated == true && User.HasClaim(AppClaims.Amr, AppClaims.Mfa))
@@ -61,7 +63,10 @@ public class LoginModel : PageModel
         }
 
         if (result.Stage == PasswordStage.LockedOut)
-            return RedirectToPage("Lockout");
+        {
+            ShowLockout = true;
+            return Page();
+        }
 
         var account = await _users.FindByIdAsync(result.UserId!);
         if (account is null)

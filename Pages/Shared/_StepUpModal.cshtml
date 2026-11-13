@@ -1,0 +1,37 @@
+@model SecureGate1.Models.StepUpModalViewModel
+<dialog
+    class="sg-modal sg-step-up-modal"
+    id="sg-step-up-modal"
+    aria-labelledby="sg-step-up-title"
+    aria-describedby="sg-step-up-desc"
+    @(Model.Required ? "data-step-up-required data-step-up-lock" : null)>
+    <div class="sg-modal-card sg-step-up-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings sg-step-up-modal-header">
+            <div class="sg-step-up-modal-icon" aria-hidden="true">
+                <vc:sg-icon name="security" />
+            </div>
+            <div class="sg-modal-header-copy">
+                <p class="sg-modal-eyebrow">Identity check</p>
+                <h2 id="sg-step-up-title">Confirm it's you</h2>
+                <p class="sg-modal-subtitle" id="sg-step-up-desc">Enter the current 6-digit code from your authenticator app to continue.</p>
+            </div>
+        </header>
+        <form method="post" asp-page-handler="StepUp" class="sg-step-up-modal-form">
+            <div class="sg-modal-body sg-step-up-modal-body">
+                @if (!string.IsNullOrEmpty(Model.Error))
+                {
+                    <p class="sg-inline-alert sg-inline-alert--error" role="alert">@Model.Error</p>
+                }
+                @{
+                    ViewData["OtpValue"] = Model.Code;
+                    ViewData["OtpHideVisibleLabel"] = true;
+                }
+                <partial name="_AuthenticatorOtp" />
+            </div>
+            <footer class="sg-modal-footer sg-step-up-modal-footer">
+                <a class="sg-btn-secondary" asp-page="/Dashboard/Index" data-step-up-leave>Back to dashboard</a>
+                <button class="sg-btn" type="submit" data-submit>Confirm</button>
+            </footer>
+        </form>
+    </div>
+</dialog>

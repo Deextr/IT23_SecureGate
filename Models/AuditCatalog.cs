@@ -48,6 +48,122 @@ public static class EventTypes
         SecuritySettingsChanged, ReportExported, InvestigationUpdated, AlertAcknowledged, AlertResolved,
         AccessDenied, IpRateLimited, ProfileUpdated
     };
+
+    public static string Label(string eventType) => eventType switch
+    {
+        PasswordFailed => "Password failed",
+        PasswordAccepted => "Password accepted",
+        AccountLocked => "Account locked",
+        SignInRejectedLocked => "Sign-in rejected (locked)",
+        SignInRejectedDisabled => "Sign-in rejected (disabled)",
+        TotpSucceeded => "TOTP succeeded",
+        TotpFailed => "TOTP failed",
+        TotpCooldown => "TOTP cooldown",
+        RecoveryCodeSucceeded => "Recovery code succeeded",
+        RecoveryCodeFailed => "Recovery code failed",
+        RecoveryCooldown => "Recovery cooldown",
+        RecoveryCodesGenerated => "Recovery codes generated",
+        RecoveryCodesRevoked => "Recovery codes revoked",
+        MfaEnrollmentConfirmed => "MFA enrollment confirmed",
+        MfaEnrollmentFailed => "MFA enrollment failed",
+        MfaResetRequested => "MFA reset requested",
+        MfaResetApproved => "MFA reset approved",
+        MfaResetRejected => "MFA reset rejected",
+        Logout => "Logout",
+        SessionAbsoluteExpired => "Session expired",
+        SessionRejected => "Session rejected",
+        PasswordChanged => "Password changed",
+        PasswordResetByAdmin => "Password reset by admin",
+        RoleChanged => "Role changed",
+        AccountCreated => "Account created",
+        AccountDisabled => "Account disabled",
+        AccountReactivated => "Account reactivated",
+        SecuritySettingsChanged => "Security settings changed",
+        ReportExported => "Report exported",
+        InvestigationUpdated => "Investigation updated",
+        AlertAcknowledged => "Alert acknowledged",
+        AlertResolved => "Alert resolved",
+        AccessDenied => "Access denied",
+        IpRateLimited => "IP rate limited",
+        ProfileUpdated => "Profile updated",
+        _ => eventType
+    };
+}
+
+public static class AuditModules
+{
+    public const string Authentication = "Authentication";
+    public const string Mfa = "MFA";
+    public const string Accounts = "Accounts";
+    public const string Sessions = "Sessions";
+    public const string Security = "Security";
+    public const string Monitoring = "Monitoring";
+
+    public static readonly IReadOnlyList<string> All =
+    [
+        Authentication, Mfa, Accounts, Sessions, Security, Monitoring
+    ];
+
+    private static readonly IReadOnlyDictionary<string, string> ByEvent = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [EventTypes.PasswordFailed] = Authentication,
+        [EventTypes.PasswordAccepted] = Authentication,
+        [EventTypes.AccountLocked] = Authentication,
+        [EventTypes.SignInRejectedLocked] = Authentication,
+        [EventTypes.SignInRejectedDisabled] = Authentication,
+        [EventTypes.TotpSucceeded] = Mfa,
+        [EventTypes.TotpFailed] = Mfa,
+        [EventTypes.TotpCooldown] = Mfa,
+        [EventTypes.RecoveryCodeSucceeded] = Mfa,
+        [EventTypes.RecoveryCodeFailed] = Mfa,
+        [EventTypes.RecoveryCooldown] = Mfa,
+        [EventTypes.RecoveryCodesGenerated] = Mfa,
+        [EventTypes.RecoveryCodesRevoked] = Mfa,
+        [EventTypes.MfaEnrollmentConfirmed] = Mfa,
+        [EventTypes.MfaEnrollmentFailed] = Mfa,
+        [EventTypes.MfaResetRequested] = Mfa,
+        [EventTypes.MfaResetApproved] = Mfa,
+        [EventTypes.MfaResetRejected] = Mfa,
+        [EventTypes.Logout] = Sessions,
+        [EventTypes.SessionAbsoluteExpired] = Sessions,
+        [EventTypes.SessionRejected] = Sessions,
+        [EventTypes.PasswordChanged] = Accounts,
+        [EventTypes.PasswordResetByAdmin] = Accounts,
+        [EventTypes.RoleChanged] = Accounts,
+        [EventTypes.AccountCreated] = Accounts,
+        [EventTypes.AccountDisabled] = Accounts,
+        [EventTypes.AccountReactivated] = Accounts,
+        [EventTypes.ProfileUpdated] = Accounts,
+        [EventTypes.SecuritySettingsChanged] = Security,
+        [EventTypes.AccessDenied] = Security,
+        [EventTypes.IpRateLimited] = Security,
+        [EventTypes.ReportExported] = Monitoring,
+        [EventTypes.InvestigationUpdated] = Monitoring,
+        [EventTypes.AlertAcknowledged] = Monitoring,
+        [EventTypes.AlertResolved] = Monitoring,
+    };
+
+    public static string GetModule(string eventType) =>
+        ByEvent.TryGetValue(eventType, out var module) ? module : "Other";
+
+    public static IReadOnlyList<string> EventTypesForModule(string? module)
+    {
+        if (string.IsNullOrWhiteSpace(module) || !All.Contains(module))
+            return [];
+        return ByEvent.Where(pair => pair.Value == module).Select(pair => pair.Key).ToList();
+    }
+
+    public static IReadOnlyList<string> EventTypesMatchingModuleSearch(string term)
+    {
+        if (string.IsNullOrWhiteSpace(term))
+            return [];
+        var lowered = term.Trim();
+        return ByEvent
+            .Where(pair => pair.Value.Contains(lowered, StringComparison.OrdinalIgnoreCase))
+            .Select(pair => pair.Key)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
 }
 
 public static class Outcomes

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using SecureGate1.Data;
@@ -16,12 +17,5 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<InvestigationRecord> Records { get; private set; } = [];
 
-    public async Task OnGetAsync(CancellationToken cancellationToken)
-    {
-        Records = await _db.InvestigationRecords
-            .Include(i => i.Alert)
-            .OrderByDescending(i => i.UpdatedAtUtc)
-            .Take(100)
-            .ToListAsync(cancellationToken);
-    }
+    public IActionResult OnGet() => RedirectToPage("/Monitoring/SecurityOperations/Index");
 }

@@ -8,7 +8,9 @@ public static class AttemptDelay
 public static class SignInMessages
 {
     public const string Generic = "Sign-in was not successful. Check your email and password.";
-    public const string Locked = "Sign-in is temporarily unavailable. Try again in a few minutes.";
+    public const string LockoutTitle = "Temporarily unavailable";
+    public const string LockoutBody = "Too many unsuccessful password attempts. Wait about 15 minutes, then try again.";
+    public const string Locked = LockoutBody;
     public const string MfaFailed = "The verification code was not accepted.";
     public const string RecoveryFailed = "The recovery code was not accepted.";
     public const string Cooldown = "Too many attempts. Try again later.";

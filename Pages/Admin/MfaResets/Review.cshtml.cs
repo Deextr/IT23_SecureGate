@@ -23,11 +23,8 @@ public class ReviewModel : PageModel
 
     public MfaResetRequest? RequestItem { get; private set; }
 
-    public async Task<IActionResult> OnGetAsync(long id, CancellationToken cancellationToken)
-    {
-        await LoadAsync(id, cancellationToken);
-        return RequestItem is null ? NotFound() : Page();
-    }
+    public IActionResult OnGet(long id) =>
+        RedirectToPage("/Admin/MfaResets/Index", new { request = id });
 
     public async Task<IActionResult> OnPostApproveAsync(long id, string? confirmation, string? decisionNotes, CancellationToken cancellationToken)
     {
@@ -39,14 +36,23 @@ public class ReviewModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    public async Task<IActionResult> OnPostRejectAsync(long id, string? decisionNotes, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostRejectAsync(
+        long id,
+        string? rejectionReason,
+        string? rejectionOther,
+        CancellationToken cancellationToken)
     {
         var gate = await GateAsync(id);
         if (gate is not null)
             return gate;
-        var result = await _resets.RejectAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id, decisionNotes, cancellationToken);
+        var result = await _resets.RejectAsync(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+            id,
+            rejectionReason,
+            rejectionOther,
+            cancellationToken);
         TempData[result.Succeeded ? "Success" : "Error"] = result.Message;
-        return RedirectToPage(new { id });
+        return RedirectToPage("/Admin/MfaResets/Index", new { request = id });
     }
 
     private async Task LoadAsync(long id, CancellationToken cancellationToken)
@@ -58,6 +64,6 @@ public class ReviewModel : PageModel
     {
         if (await _stepUp.IsFreshAsync(User))
             return null;
-        return RedirectToPage("/Account/Reauthenticate", new { returnUrl = Url.Page("/Admin/MfaResets/Review", new { id }) });
+        return RedirectToPage("/Account/Reauthenticate", new { returnUrl = Url.Page("/Admin/MfaResets/Index", new { request = id })! });
     }
 }

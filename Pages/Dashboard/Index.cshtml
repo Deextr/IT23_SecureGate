@@ -1,64 +1,55 @@
 @page
 @model SecureGate1.Pages.Dashboard.IndexModel
 @{
-    ViewData["Title"] = "Dashboard";
+    var payload = Model.Payload;
+    var preset = payload.Preset;
+    var fromValue = payload.From;
+    var toValue = payload.To;
+    var customOpen = preset == DashboardPresets.Custom;
 }
-<p class="sg-lede">Hello, @Model.DisplayName · @Model.RoleName</p>
-<div class="sg-grid sg-grid-3">
-    <section class="sg-stat-card is-accent">
-        <p class="sg-help">Active accounts</p>
-        <p class="sg-stat">@Model.Summary.ActiveUsers</p>
-    </section>
-    <section class="sg-stat-card">
-        <p class="sg-help">Open alerts</p>
-        <p class="sg-stat">@Model.Summary.OpenAlerts</p>
-    </section>
-    <section class="sg-stat-card">
-        <p class="sg-help">Failed passwords today</p>
-        <p class="sg-stat">@Model.Summary.FailedPasswordsToday</p>
-    </section>
-</div>
-<div class="sg-grid sg-grid-2">
-    <section class="sg-card">
-        <h2>Recent activity</h2>
-        @if (Model.Summary.RecentEvents.Count == 0)
-        {
-            <p class="sg-empty">No events yet.</p>
-        }
-        else
-        {
-            <div class="sg-table-wrap">
-                <table class="sg-table">
-                    <thead><tr><th>When (UTC)</th><th>Event</th><th>Outcome</th></tr></thead>
-                    <tbody>
-                    @foreach (var item in Model.Summary.RecentEvents)
-                    {
-                        <tr>
-                            <td>@item.OccurredAtUtc.ToString("u")</td>
-                            <td>@item.EventType</td>
-                            <td>@item.Outcome</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+
+<div class="sg-dash-toolbar" data-dashboard-root data-kind="@payload.Kind">
+    <form method="get" class="sg-dash-toolbar-form" data-dashboard-form>
+        <div class="sg-dash-toolbar-row">
+            <div class="sg-dash-presets" role="group" aria-label="Date range">
+                <button class="sg-dash-preset@(preset == DashboardPresets.Today ? " is-active" : "")" type="submit" name="preset" value="@DashboardPresets.Today">Today</button>
+                <button class="sg-dash-preset@(preset == DashboardPresets.Last7Days || string.IsNullOrEmpty(preset) ? " is-active" : "")" type="submit" name="preset" value="@DashboardPresets.Last7Days">Last 7 days</button>
+                <button class="sg-dash-preset@(preset == DashboardPresets.LastMonth ? " is-active" : "")" type="submit" name="preset" value="@DashboardPresets.LastMonth">Last month</button>
+                <button class="sg-dash-preset@(preset == DashboardPresets.LastYear ? " is-active" : "")" type="submit" name="preset" value="@DashboardPresets.LastYear">Last year</button>
+                <button class="sg-dash-preset@(customOpen ? " is-active" : "")" type="button" data-dash-show-custom>Custom range</button>
             </div>
-        }
-    </section>
-    <section class="sg-card">
-        <h2>Open alerts</h2>
-        @if (Model.Summary.OpenAlertList.Count == 0)
-        {
-            <p class="sg-empty">No open alerts.</p>
-        }
-        else
-        {
-            <ul class="sg-alert-list">
-                @foreach (var alert in Model.Summary.OpenAlertList)
-                {
-                    <li><span class="sg-badge">@alert.Severity</span> @alert.Title</li>
-                }
-            </ul>
-        }
-        <p class="sg-help">Pending recovery: @Model.Summary.PendingResets. Disabled accounts: @Model.Summary.DisabledUsers.</p>
-    </section>
+            <div class="sg-dash-custom @(customOpen ? "" : "is-collapsed")" data-dash-custom>
+                <label class="sg-visually-hidden" for="dash-from">From</label>
+                <input class="sg-input sg-dash-date" type="date" id="dash-from" name="from" value="@fromValue" aria-label="From date" />
+                <span class="sg-dash-date-sep" aria-hidden="true">–</span>
+                <label class="sg-visually-hidden" for="dash-to">To</label>
+                <input class="sg-input sg-dash-date" type="date" id="dash-to" name="to" value="@toValue" aria-label="To date" />
+                <button class="sg-btn sg-btn--compact" type="submit" name="preset" value="@DashboardPresets.Custom">Apply</button>
+            </div>
+        </div>
+        <p class="sg-dash-range-label" data-range-label>@payload.RangeLabel</p>
+        <p class="sg-dash-error" data-range-error @(string.IsNullOrEmpty(payload.Error) ? "hidden" : null)>@payload.Error</p>
+    </form>
 </div>
+
+<p class="sg-empty sg-dash-invalid" data-dashboard-invalid @(string.IsNullOrEmpty(payload.Error) ? "hidden" : null)>Choose a valid date range to load the dashboard.</p>
+<div class="sg-dash" data-dashboard-body @(string.IsNullOrEmpty(payload.Error) ? null : "hidden")>
+    @if (Model.Kind == DashboardKind.Administrator && payload.Admin is not null)
+    {
+        <partial name="_AdminDashboard" model="payload.Admin" />
+    }
+    else if (Model.Kind == DashboardKind.SecurityOfficer && payload.Officer is not null)
+    {
+        <partial name="_OfficerDashboard" model="payload.Officer" />
+    }
+    else if (payload.Employee is not null)
+    {
+        <partial name="_EmployeeDashboard" model="payload.Employee" />
+    }
+</div>
+
+<script type="application/json" id="sg-dashboard-data">@Html.Raw(Model.PayloadJson)</script>
+
+@section Scripts {
+    <script src="~/js/dashboard.js" asp-append-version="true"></script>
+}

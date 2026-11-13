@@ -1,24 +1,57 @@
 @page "{id:long}"
+@using SecureGate1.Services
 @model SecureGate1.Pages.Monitoring.AuditLogs.DetailsModel
 @{
-    ViewData["Title"] = Model.Event?.EventType ?? "Event";
+    ViewData["Title"] = Model.Detail?.ActionLabel ?? "Audit event";
 }
-@if (Model.Event is null)
+@if (Model.Detail is null)
 {
     <p>That event was not found.</p>
 }
 else
 {
+    var detail = Model.Detail;
+    var ev = detail.Event;
+    <p class="sg-lede">@detail.Module · @detail.ActionLabel</p>
     <dl class="sg-card sg-meta">
-        <dt>When (UTC)</dt><dd>@Model.Event.OccurredAtUtc.ToString("u")</dd>
-        <dt>Outcome</dt><dd>@Model.Event.Outcome</dd>
-        <dt>Severity</dt><dd>@Model.Event.Severity</dd>
-        <dt>Actor</dt><dd>@(Model.Event.ActorUserId ?? "Unknown")</dd>
-        <dt>Target</dt><dd>@(Model.Event.TargetUserId ?? "None")</dd>
-        <dt>Submitted name</dt><dd>@(Model.Event.SubjectIdentifier ?? "None")</dd>
-        <dt>IP address</dt><dd>@(Model.Event.IpAddress ?? "None")</dd>
-        <dt>Correlation</dt><dd>@(Model.Event.CorrelationId ?? "None")</dd>
-        <dt>Details</dt><dd>@(Model.Event.Details ?? "None")</dd>
+        <dt>When</dt><dd>@DisplayTime.Local(ev.OccurredAtUtc)</dd>
+        <dt>Actor</dt>
+        <dd>
+            <strong>@detail.Actor.PrimaryName</strong>
+            @if (!string.IsNullOrWhiteSpace(detail.Actor.SecondaryLine))
+            {
+                <span class="sg-accounts-email">@detail.Actor.SecondaryLine</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(detail.Actor.RoleLabel))
+            {
+                <span class="sg-help">(@detail.Actor.RoleLabel)</span>
+            }
+        </dd>
+        <dt>Target</dt>
+        <dd>
+            <strong>@detail.Target.PrimaryName</strong>
+            @if (!string.IsNullOrWhiteSpace(detail.Target.SecondaryLine))
+            {
+                <span class="sg-accounts-email">@detail.Target.SecondaryLine</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(detail.Target.RoleLabel))
+            {
+                <span class="sg-help">(@detail.Target.RoleLabel)</span>
+            }
+        </dd>
+        <dt>Submitted identifier</dt><dd>@(ev.SubjectIdentifier ?? "None")</dd>
+        <dt>Outcome</dt><dd>@ev.Outcome</dd>
+        <dt>Severity</dt><dd>@ev.Severity</dd>
+        <dt>IP address</dt><dd>@(ev.IpAddress ?? "None")</dd>
+        <dt>Correlation</dt><dd>@(ev.CorrelationId ?? "None")</dd>
+        <dt>Details</dt><dd>@(ev.Details ?? "None")</dd>
+        @if (!string.IsNullOrWhiteSpace(detail.Actor.UserId) || !string.IsNullOrWhiteSpace(detail.Target.UserId))
+        {
+            <dt>Internal account IDs</dt>
+            <dd class="sg-help">
+                Actor: @(detail.Actor.UserId ?? ev.ActorUserId ?? "—") · Target: @(detail.Target.UserId ?? ev.TargetUserId ?? "—")
+            </dd>
+        }
     </dl>
-    <p><a class="sg-btn-ghost" asp-page="Index">Back</a></p>
+    <p><a class="sg-btn-ghost" asp-page="Index">Back to audit logs</a></p>
 }

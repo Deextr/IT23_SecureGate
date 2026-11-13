@@ -1,0 +1,36 @@
+@model IReadOnlyList<SecureGate1.Services.DashboardEventItem>
+@if (Model.Count == 0)
+{
+    <p class="sg-empty">Nothing recorded in this range.</p>
+}
+else
+{
+    <ul class="sg-dash-feed">
+        @foreach (var item in Model)
+        {
+            <li class="sg-dash-feed-item">
+                @if (!string.IsNullOrEmpty(item.Href))
+                {
+                    <a class="sg-dash-feed-link" href="@item.Href">
+                        <span class="sg-dash-feed-main">
+                            <span class="sg-dash-feed-title">@item.Title</span>
+                            <span class="sg-dash-feed-meta">@item.Detail</span>
+                        </span>
+                        <span class="sg-dash-feed-when">@item.When</span>
+                        <span class="sg-dash-chevron" aria-hidden="true"></span>
+                    </a>
+                }
+                else
+                {
+                    <div class="sg-dash-feed-link is-static">
+                        <span class="sg-dash-feed-main">
+                            <span class="sg-dash-feed-title">@item.Title</span>
+                            <span class="sg-dash-feed-meta">@item.Detail</span>
+                        </span>
+                        <span class="sg-dash-feed-when">@item.When</span>
+                    </div>
+                }
+            </li>
+        }
+    </ul>
+}

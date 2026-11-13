@@ -1,68 +1,338 @@
 @page
+@using System.Text.Json
+@using SecureGate1.Models
+@using SecureGate1.Services
 @model SecureGate1.Pages.Monitoring.AuditLogs.IndexModel
 @{
-    ViewData["Title"] = "Audit log";
+    ViewData["Title"] = "Audit Logs";
+    string OutcomeBadgeClass(string outcome) => outcome switch
+    {
+        Outcomes.Success => "sg-badge-good",
+        Outcomes.Failure => "sg-badge-bad",
+        Outcomes.Denied => "sg-badge-warn",
+        _ => "sg-badge-neutral"
+    };
+    string AccountLine(AuditAccountDisplay account)
+    {
+        if (account.PrimaryName == "Unknown account" && string.IsNullOrWhiteSpace(account.SecondaryLine))
+            return "—";
+        if (string.IsNullOrWhiteSpace(account.SecondaryLine))
+            return account.PrimaryName;
+        return $"{account.PrimaryName} ({account.SecondaryLine})";
+    }
 }
-<p class="sg-lede">Times are UTC. Rows cannot be edited here. CSV export is for administrators only.</p>
-<form method="get" class="filter-bar sg-card">
-    <div class="sg-field"><label class="sg-label" for="from">From</label><input class="sg-input" id="from" type="date" name="from" value="@Model.From" /></div>
-    <div class="sg-field"><label class="sg-label" for="to">To</label><input class="sg-input" id="to" type="date" name="to" value="@Model.To" /></div>
-    <div class="sg-field"><label class="sg-label" for="eventType">Event</label><input class="sg-input" id="eventType" name="eventType" value="@Model.EventType" maxlength="64" /></div>
-    <div class="sg-field"><label class="sg-label" for="outcome">Outcome</label>
-        <select class="sg-select" id="outcome" name="outcome">
-            <option value="">Any</option>
-            <option value="Success" selected="@(Model.Outcome == "Success")">Success</option>
-            <option value="Failure" selected="@(Model.Outcome == "Failure")">Failure</option>
-            <option value="Denied" selected="@(Model.Outcome == "Denied")">Denied</option>
-        </select>
+<p class="sg-lede">Review sign-in, account, and security activity across SecureGate. Times use your local timezone and 12-hour clock. Records are read-only.</p>
+
+<div class="sg-accounts sg-audit-logs" data-admin-audit-logs>
+    <section class="sg-accounts-card sg-audit-filter-card" aria-labelledby="sg-audit-filters-heading">
+        <header class="sg-audit-filter-card-header">
+            <div>
+                <h2 class="sg-audit-filter-card-title" id="sg-audit-filters-heading">Filters</h2>
+                <p class="sg-audit-filter-card-hint">Search and date range apply together with role, module, and outcome.</p>
+            </div>
+            <div class="sg-audit-filter-card-actions">
+                @if (Model.HasActiveFilters)
+                {
+                    <a class="sg-btn-ghost sg-audit-clear-filters" asp-page="Index">Clear all</a>
+                }
+                @if (Model.CanExport)
+                {
+                    <div class="sg-audit-export-actions" aria-label="Export options">
+                        <a
+                            class="sg-audit-export sg-audit-export--csv"
+                            asp-page="Index"
+                            asp-page-handler="ExportCsv"
+                            asp-route-from="@Model.From"
+                            asp-route-to="@Model.To"
+                            asp-route-search="@Model.Search"
+                            asp-route-outcome="@Model.Outcome"
+                            asp-route-role="@Model.Role"
+                            asp-route-module="@Model.Module">
+                            <vc:sg-icon name="csv" />
+                            <span>Export CSV</span>
+                        </a>
+                        <a
+                            class="sg-audit-export sg-audit-export--pdf"
+                            asp-page="Index"
+                            asp-page-handler="ExportPdf"
+                            asp-route-from="@Model.From"
+                            asp-route-to="@Model.To"
+                            asp-route-search="@Model.Search"
+                            asp-route-outcome="@Model.Outcome"
+                            asp-route-role="@Model.Role"
+                            asp-route-module="@Model.Module">
+                            <vc:sg-icon name="pdf" />
+                            <span>Export PDF</span>
+                        </a>
+                    </div>
+                }
+            </div>
+        </header>
+
+        <form method="get" class="sg-audit-filter-form" id="sg-audit-filter-form">
+            <div class="sg-audit-filter-row sg-audit-filter-row--primary">
+                <div class="sg-field sg-audit-filter-search">
+                    <label class="sg-label" for="search">Search</label>
+                    <div class="sg-accounts-search sg-audit-search-control">
+                        <span class="sg-accounts-search-icon" aria-hidden="true"><vc:sg-icon name="search" /></span>
+                        <input
+                            class="sg-input sg-accounts-search-input"
+                            id="search"
+                            name="search"
+                            value="@Model.Search"
+                            maxlength="100"
+                            placeholder="Name, email, action, module, description…"
+                            autocomplete="off" />
+                    </div>
+                </div>
+                <div class="sg-field sg-audit-filter-dates">
+                    <span class="sg-label" id="sg-audit-date-label">Date range</span>
+                    <div class="sg-audit-date-inputs" role="group" aria-labelledby="sg-audit-date-label">
+                        <label class="sg-visually-hidden" for="from">From date</label>
+                        <input
+                            class="sg-input sg-audit-date-input"
+                            type="date"
+                            id="from"
+                            name="from"
+                            value="@Model.From"
+                            data-date-range="from" />
+                        <span class="sg-recovery-date-sep" aria-hidden="true">to</span>
+                        <label class="sg-visually-hidden" for="to">To date</label>
+                        <input
+                            class="sg-input sg-audit-date-input"
+                            type="date"
+                            id="to"
+                            name="to"
+                            value="@Model.To"
+                            data-date-range="to" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="sg-audit-filter-row sg-audit-filter-row--grid">
+                <div class="sg-field">
+                    <label class="sg-label" for="role">Role</label>
+                    <select class="sg-select" id="role" name="role" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Role))">All roles</option>
+                        <option value="@Roles.Employee" selected="@(Model.Role == Roles.Employee)">Employee</option>
+                        <option value="@Roles.SecurityOfficer" selected="@(Model.Role == Roles.SecurityOfficer)">Security Officer</option>
+                        <option value="@Roles.Administrator" selected="@(Model.Role == Roles.Administrator)">Administrator</option>
+                        <option value="@Roles.Superadmin" selected="@(Model.Role == Roles.Superadmin)">Superadmin</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="module">Module</label>
+                    <select class="sg-select" id="module" name="module" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Module))">All modules</option>
+                        @foreach (var moduleName in AuditModules.All)
+                        {
+                            <option value="@moduleName" selected="@(Model.Module == moduleName)">@moduleName</option>
+                        }
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="outcome">Outcome</label>
+                    <select class="sg-select" id="outcome" name="outcome" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Outcome))">All outcomes</option>
+                        <option value="@Outcomes.Success" selected="@(Model.Outcome == Outcomes.Success)">Success</option>
+                        <option value="@Outcomes.Failure" selected="@(Model.Outcome == Outcomes.Failure)">Failure</option>
+                        <option value="@Outcomes.Denied" selected="@(Model.Outcome == Outcomes.Denied)">Denied</option>
+                    </select>
+                </div>
+            </div>
+
+            <input type="hidden" name="pageNumber" value="1" />
+        </form>
+    </section>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
+    }
+
+    <div class="sg-accounts-card">
+        <div class="sg-table-wrap">
+            <table class="sg-table sg-accounts-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Timestamp</th>
+                        <th scope="col">Account</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Action</th>
+                        <th scope="col">Module</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Results.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="sg-empty">@(Model.HasActiveFilters ? "No audit records match the current filters." : "No audit records in this date range.")</td>
+                    </tr>
+                }
+                @foreach (var item in Model.Results.Items)
+                {
+                    var account = item.Account;
+                    var ev = item.Event;
+                    var outcomeClass = OutcomeBadgeClass(ev.Outcome);
+                    var actor = item.Actor;
+                    var target = item.Target;
+                    var eventJson = JsonSerializer.Serialize(new
+                    {
+                        id = ev.EventId,
+                        timestamp = DisplayTime.Local(ev.OccurredAtUtc),
+                        actionLabel = item.ActionLabel,
+                        module = item.Module,
+                        outcome = ev.Outcome,
+                        outcomeBadge = outcomeClass,
+                        severity = ev.Severity,
+                        description = ev.Details ?? "",
+                        accountLine = AccountLine(account),
+                        actorLine = AccountLine(actor),
+                        targetLine = AccountLine(target),
+                        actorRole = actor.RoleLabel ?? "",
+                        targetRole = target.RoleLabel ?? "",
+                        subjectIdentifier = ev.SubjectIdentifier ?? "",
+                        ipAddress = ev.IpAddress ?? "",
+                        correlationId = ev.CorrelationId ?? "",
+                        actorUserId = ev.ActorUserId ?? "",
+                        targetUserId = ev.TargetUserId ?? ""
+                    });
+                    <tr
+                        class="sg-accounts-row"
+                        data-audit-event="@eventJson"
+                        tabindex="0"
+                        role="button"
+                        aria-label="View details for @item.ActionLabel"
+                        aria-haspopup="dialog">
+                        <td class="sg-accounts-date">@DisplayTime.Local(ev.OccurredAtUtc)</td>
+                        <td>
+                            <span class="sg-accounts-name@(account.IsUnavailable ? " sg-audit-account-muted" : "")">@account.PrimaryName</span>
+                            @if (!string.IsNullOrWhiteSpace(account.SecondaryLine))
+                            {
+                                <span class="sg-accounts-email">@account.SecondaryLine</span>
+                            }
+                        </td>
+                        <td>@(account.RoleLabel ?? "—")</td>
+                        <td>@item.ActionLabel</td>
+                        <td>@item.Module</td>
+                        <td class="sg-audit-description">@(string.IsNullOrWhiteSpace(ev.Details) ? "—" : ev.Details)</td>
+                        <td><span class="sg-badge @outcomeClass">@ev.Outcome</span></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="sg-accounts-footer">
+            <p class="sg-accounts-range">
+                Showing @Model.RangeStart–@Model.RangeEnd of @Model.Results.Total results
+            </p>
+            <div class="sg-accounts-pager">
+                <span class="sg-accounts-page-size">Rows per page: @Model.PageSize</span>
+                @if (Model.Results.TotalPages > 1)
+                {
+                    <nav class="sg-accounts-pages" aria-label="Pagination">
+                        @if (Model.PageNumber > 1)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-pageNumber="@(Model.PageNumber - 1)"
+                                asp-route-from="@Model.From"
+                                asp-route-to="@Model.To"
+                                asp-route-search="@Model.Search"
+                                asp-route-outcome="@Model.Outcome"
+                                asp-route-role="@Model.Role"
+                                asp-route-module="@Model.Module"
+                                aria-label="Previous page">‹</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">‹</span>
+                        }
+                        <span class="sg-accounts-page-btn is-current" aria-current="page">@Model.PageNumber</span>
+                        @if (Model.PageNumber < Model.Results.TotalPages)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-pageNumber="@(Model.PageNumber + 1)"
+                                asp-route-from="@Model.From"
+                                asp-route-to="@Model.To"
+                                asp-route-search="@Model.Search"
+                                asp-route-outcome="@Model.Outcome"
+                                asp-route-role="@Model.Role"
+                                asp-route-module="@Model.Module"
+                                aria-label="Next page">›</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">›</span>
+                        }
+                    </nav>
+                }
+            </div>
+        </footer>
     </div>
-    <div class="sg-field"><label class="sg-label" for="severity">Severity</label><input class="sg-input" id="severity" name="severity" value="@Model.Severity" maxlength="20" /></div>
-    <div class="sg-field"><label class="sg-label" for="account">Account</label><input class="sg-input" id="account" name="account" value="@Model.Account" maxlength="254" /></div>
-    <div class="sg-field"><label class="sg-label" for="pageSize">Rows</label><input class="sg-input" id="pageSize" name="pageSize" value="@Model.PageSize" /></div>
-    <div class="sg-actions">
-        <button class="sg-btn" type="submit">Filter</button>
-        @if (User.IsInRole(Roles.Superadmin) || User.IsInRole(Roles.Administrator))
-        {
-            <a class="sg-btn-secondary" asp-page="Index" asp-page-handler="Export" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account">Export CSV</a>
-        }
-    </div>
-</form>
-@if (!string.IsNullOrEmpty(Model.Error))
-{
-    <div class="sg-banner sg-banner-error" role="alert">@Model.Error</div>
-}
-<div class="sg-table-wrap">
-    <table class="sg-table">
-        <thead><tr><th>When (UTC)</th><th>Event</th><th>Outcome</th><th>Severity</th><th>Account</th></tr></thead>
-        <tbody>
-        @if (Model.Results.Items.Count == 0)
-        {
-            <tr><td colspan="5" class="sg-empty">No matching events.</td></tr>
-        }
-        @foreach (var item in Model.Results.Items)
-        {
-            <tr>
-                <td><a asp-page="Details" asp-route-id="@item.EventId">@item.OccurredAtUtc.ToString("u")</a></td>
-                <td>@item.EventType</td>
-                <td>@item.Outcome</td>
-                <td><span class="sg-badge">@item.Severity</span></td>
-                <td>@(item.SubjectIdentifier ?? item.TargetUserId ?? "Unknown")</td>
-            </tr>
-        }
-        </tbody>
-    </table>
 </div>
-@if (Model.Results.TotalPages > 1)
-{
-    <p class="sg-actions">
-        @if (Model.PageNumber > 1)
-        {
-            <a class="sg-btn-ghost" asp-page="Index" asp-route-pageNumber="@(Model.PageNumber - 1)" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account" asp-route-pageSize="@Model.PageSize">Previous</a>
-        }
-        <span>Page @Model.PageNumber of @Model.Results.TotalPages (@Model.Results.Total events)</span>
-        @if (Model.PageNumber < Model.Results.TotalPages)
-        {
-            <a class="sg-btn-ghost" asp-page="Index" asp-route-pageNumber="@(Model.PageNumber + 1)" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-eventType="@Model.EventType" asp-route-outcome="@Model.Outcome" asp-route-severity="@Model.Severity" asp-route-account="@Model.Account" asp-route-pageSize="@Model.PageSize">Next</a>
-        }
-    </p>
+
+<dialog class="sg-modal sg-audit-detail-modal" id="sg-audit-detail-modal" aria-labelledby="sg-audit-detail-title">
+    <div class="sg-modal-card sg-audit-detail-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-audit-detail-title">Audit event</h2>
+                <p class="sg-modal-subtitle" id="sg-audit-detail-subtitle"></p>
+            </div>
+            <button class="sg-modal-close" type="button" data-audit-detail-close aria-label="Close details">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll sg-audit-detail-body">
+            <dl class="sg-recovery-review-summary sg-audit-detail-summary">
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Timestamp</dt>
+                    <dd id="sg-audit-detail-timestamp"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Outcome</dt>
+                    <dd id="sg-audit-detail-outcome"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Severity</dt>
+                    <dd id="sg-audit-detail-severity"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Module</dt>
+                    <dd id="sg-audit-detail-module"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Account</dt>
+                    <dd id="sg-audit-detail-account"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item" id="sg-audit-detail-subject-row" hidden>
+                    <dt>Submitted identifier</dt>
+                    <dd id="sg-audit-detail-subject"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>IP address</dt>
+                    <dd id="sg-audit-detail-ip"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item" id="sg-audit-detail-correlation-row" hidden>
+                    <dt>Correlation</dt>
+                    <dd id="sg-audit-detail-correlation"></dd>
+                </div>
+            </dl>
+            <section class="sg-recovery-review-block" aria-labelledby="sg-audit-detail-desc-label">
+                <h3 class="sg-recovery-review-block-title" id="sg-audit-detail-desc-label">Description</h3>
+                <p class="sg-recovery-review-notes" id="sg-audit-detail-description"></p>
+            </section>
+            <p class="sg-help" id="sg-audit-detail-ids" hidden></p>
+        </div>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script src="~/js/admin-audit-logs.js" asp-append-version="true"></script>
 }

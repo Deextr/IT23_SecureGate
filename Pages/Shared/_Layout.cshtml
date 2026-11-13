@@ -39,24 +39,23 @@
                     <span>Settings</span>
                 </a>
             }
+            @if (User.IsInRole(Roles.SecurityOfficer) && !User.IsInRole(Roles.Superadmin) && !User.IsInRole(Roles.Administrator))
+            {
+                <a class="sg-nav-link" asp-page="/MfaResets/Index">
+                    <vc:sg-icon name="reset" />
+                    <span>Recovery</span>
+                </a>
+            }
             @if (User.IsInRole(Roles.Superadmin) || User.IsInRole(Roles.Administrator) || User.IsInRole(Roles.SecurityOfficer))
             {
                 <p class="sg-nav-label">Monitoring</p>
                 <a class="sg-nav-link" asp-page="/Monitoring/AuditLogs/Index">
                     <vc:sg-icon name="audit" />
-                    <span>Audit log</span>
+                    <span>Audit logs</span>
                 </a>
-                <a class="sg-nav-link" asp-page="/Monitoring/Alerts/Index">
-                    <vc:sg-icon name="alerts" />
-                    <span>Alerts</span>
-                </a>
-                <a class="sg-nav-link" asp-page="/Monitoring/Investigations/Index">
-                    <vc:sg-icon name="investigate" />
-                    <span>Investigations</span>
-                </a>
-                <a class="sg-nav-link" asp-page="/MfaResets/Request">
-                    <vc:sg-icon name="reset" />
-                    <span>Request reset</span>
+                <a class="sg-nav-link" asp-page="/Monitoring/SecurityOperations/Index">
+                    <vc:sg-icon name="security" />
+                    <span>Security Operations</span>
                 </a>
             }
         </nav>

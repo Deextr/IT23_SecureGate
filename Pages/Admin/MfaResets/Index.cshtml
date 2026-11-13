@@ -1,29 +1,324 @@
 @page
+@using System.Text.Json
 @model SecureGate1.Pages.Admin.MfaResets.IndexModel
 @{
     ViewData["Title"] = "Recovery";
+    var openSubmit = TempData["OpenSubmitModal"] is not null
+        || string.Equals(Request.Query["submit"], "open", StringComparison.OrdinalIgnoreCase);
+    long? openRequestId = Model.OpenRequestId;
+    if (openRequestId is null or 0)
+    {
+        var requestQuery = Request.Query["request"].ToString();
+        if (long.TryParse(requestQuery, out var parsed) && parsed > 0)
+            openRequestId = parsed;
+    }
+    string StatusBadgeClass(string status) => status switch
+    {
+        ResetRequestStatuses.Pending => "sg-badge-warn",
+        ResetRequestStatuses.Approved => "sg-badge-good",
+        ResetRequestStatuses.Rejected => "sg-badge-bad",
+        _ => "sg-badge-neutral"
+    };
+    string StatusLabel(string status) => status switch
+    {
+        ResetRequestStatuses.Pending => "Pending",
+        ResetRequestStatuses.Approved => "Approved",
+        ResetRequestStatuses.Rejected => "Rejected",
+        _ => status
+    };
 }
 <p class="sg-lede">Approve only after identity was checked in person or through a separate organization process.</p>
-@if (Model.Requests.Count == 0)
-{
-    <p class="sg-empty">No recovery requests.</p>
-}
-else
-{
-    <div class="sg-table-wrap">
-        <table class="sg-table">
-            <thead><tr><th>When (UTC)</th><th>Employee</th><th>Status</th><th>Method</th></tr></thead>
-            <tbody>
-            @foreach (var request in Model.Requests)
+
+<div
+    class="sg-accounts sg-recovery-admin"
+    data-admin-recovery
+    data-recovery-submit-root
+    data-employee-search-url="@Url.Page("/MfaResets/EmployeeSearch")"
+    data-can-review="@(Model.CanReviewRequests ? "true" : "false")"
+    @(openSubmit ? " data-open-submit-request" : "")
+    @(openRequestId is not null ? $" data-open-request-id=\"{openRequestId}\"" : "")>
+    <div class="sg-accounts-toolbar">
+        <form method="get" class="sg-accounts-filters sg-recovery-filters" id="sg-recovery-filter-form">
+            <div class="sg-accounts-search">
+                <span class="sg-accounts-search-icon" aria-hidden="true"><vc:sg-icon name="search" /></span>
+                <label class="sg-visually-hidden" for="search">Search</label>
+                <input
+                    class="sg-input sg-accounts-search-input"
+                    id="search"
+                    name="search"
+                    value="@Model.Search"
+                    maxlength="100"
+                    placeholder="Search employee or requester"
+                    autocomplete="off" />
+            </div>
+            <select class="sg-select sg-accounts-filter" id="status" name="status" aria-label="Request status" data-auto-submit>
+                <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter))">All statuses</option>
+                <option value="@ResetRequestStatuses.Pending" selected="@(Model.StatusFilter == ResetRequestStatuses.Pending)">Pending</option>
+                <option value="@ResetRequestStatuses.Approved" selected="@(Model.StatusFilter == ResetRequestStatuses.Approved)">Approved</option>
+                <option value="@ResetRequestStatuses.Rejected" selected="@(Model.StatusFilter == ResetRequestStatuses.Rejected)">Rejected</option>
+            </select>
+            <select class="sg-select sg-accounts-filter" id="role" name="role" aria-label="Employee role" data-auto-submit>
+                <option value="" selected="@(string.IsNullOrEmpty(Model.RoleFilter))">All roles</option>
+                <option value="@Roles.Employee" selected="@(Model.RoleFilter == Roles.Employee)">Employee</option>
+                <option value="@Roles.SecurityOfficer" selected="@(Model.RoleFilter == Roles.SecurityOfficer)">Security Officer</option>
+                <option value="@Roles.Administrator" selected="@(Model.RoleFilter == Roles.Administrator)">Administrator</option>
+                <option value="@Roles.Superadmin" selected="@(Model.RoleFilter == Roles.Superadmin)">Superadmin</option>
+            </select>
+            <div class="sg-recovery-date-group" role="group" aria-label="Submission date range">
+                <label class="sg-visually-hidden" for="from">From date</label>
+                <input
+                    class="sg-input sg-accounts-filter sg-recovery-date-input"
+                    type="date"
+                    id="from"
+                    name="from"
+                    value="@Model.SubmittedFrom"
+                    title="From date"
+                    data-date-range="from"
+                    data-auto-submit />
+                <span class="sg-recovery-date-sep" aria-hidden="true">to</span>
+                <label class="sg-visually-hidden" for="to">To date</label>
+                <input
+                    class="sg-input sg-accounts-filter sg-recovery-date-input"
+                    type="date"
+                    id="to"
+                    name="to"
+                    value="@Model.SubmittedTo"
+                    title="To date"
+                    data-date-range="to"
+                    data-auto-submit />
+            </div>
+            @if (Model.HasActiveFilters)
             {
-                <tr>
-                    <td>@request.CreatedAtUtc.ToString("u")</td>
-                    <td><a asp-page="Review" asp-route-id="@request.MfaResetRequestId">@request.TargetUser.DisplayName (@request.TargetUser.Email)</a></td>
-                    <td>@request.Status</td>
-                    <td>@VerificationMethods.DisplayName(request.VerificationMethod)</td>
-                </tr>
+                <a class="sg-btn-ghost sg-recovery-clear-filters" asp-page="Index">Clear</a>
             }
-            </tbody>
-        </table>
+            <input type="hidden" name="pageNumber" value="1" />
+        </form>
+        @if (Model.CanSubmitRequests)
+        {
+            <button class="sg-btn sg-accounts-create" type="button" data-recovery-submit-open>Request reset</button>
+        }
     </div>
+    @if (!string.IsNullOrEmpty(Model.DateRangeError))
+    {
+        <p class="sg-recovery-filter-error" role="alert">@Model.DateRangeError</p>
+    }
+
+    <div class="sg-accounts-card">
+        <div class="sg-table-wrap">
+            <table class="sg-table sg-accounts-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Submitted</th>
+                        <th scope="col">Employee</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Requester</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Requests.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="sg-empty">@(Model.HasActiveFilters ? "No matching recovery requests." : "No recovery requests.")</td>
+                    </tr>
+                }
+                @foreach (var item in Model.Requests)
+                {
+                    var roleLabel = string.IsNullOrEmpty(item.TargetRole) ? "None" : Roles.DisplayName(item.TargetRole);
+                    var requestJson = JsonSerializer.Serialize(new
+                    {
+                        id = item.MfaResetRequestId,
+                        createdAt = item.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt"),
+                        reviewedAt = item.ReviewedAtUtc?.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt"),
+                        status = item.Status,
+                        statusLabel = StatusLabel(item.Status),
+                        statusBadge = StatusBadgeClass(item.Status),
+                        method = VerificationMethods.DisplayName(item.VerificationMethod),
+                        notes = item.Notes,
+                        checklistItems = RecoveryNotesFormatter.ParseChecklistItems(item.Notes),
+                        decisionNotes = item.DecisionNotes ?? "",
+                        targetName = item.TargetDisplayName,
+                        targetEmail = item.TargetEmail ?? "",
+                        targetRole = roleLabel,
+                        requesterName = item.RequesterDisplayName,
+                        requesterEmail = item.RequesterEmail ?? "",
+                        canDecide = Model.CanReviewRequests && item.Status == ResetRequestStatuses.Pending
+                    });
+                    <tr
+                        class="sg-accounts-row"
+                        data-request-id="@item.MfaResetRequestId"
+                        data-request="@requestJson"
+                        tabindex="0"
+                        role="button"
+                        aria-label="Review recovery request for @item.TargetDisplayName"
+                        aria-haspopup="dialog">
+                        <td class="sg-accounts-date">@item.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy")</td>
+                        <td>
+                            <span class="sg-accounts-name">@item.TargetDisplayName</span>
+                            <span class="sg-accounts-email">@item.TargetEmail</span>
+                        </td>
+                        <td>@roleLabel</td>
+                        <td>@item.RequesterDisplayName</td>
+                        <td><span class="sg-badge @StatusBadgeClass(item.Status)">@StatusLabel(item.Status)</span></td>
+                        <td>@VerificationMethods.DisplayName(item.VerificationMethod)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="sg-accounts-footer">
+            <p class="sg-accounts-range">
+                Showing @Model.RangeStart–@Model.RangeEnd of @Model.TotalCount results
+            </p>
+            <div class="sg-accounts-pager">
+                <span class="sg-accounts-page-size">Rows per page: @Model.PageSize</span>
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="sg-accounts-pages" aria-label="Pagination">
+                        @if (Model.PageNumber > 1)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-search="@Model.Search"
+                                asp-route-status="@Model.StatusFilter"
+                                asp-route-role="@Model.RoleFilter"
+                                asp-route-from="@Model.SubmittedFrom"
+                                asp-route-to="@Model.SubmittedTo"
+                                asp-route-pageNumber="@(Model.PageNumber - 1)"
+                                aria-label="Previous page">‹</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">‹</span>
+                        }
+                        <span class="sg-accounts-page-btn is-current" aria-current="page">@Model.PageNumber</span>
+                        @if (Model.PageNumber < Model.TotalPages)
+                        {
+                            <a
+                                class="sg-accounts-page-btn"
+                                asp-page="Index"
+                                asp-route-search="@Model.Search"
+                                asp-route-status="@Model.StatusFilter"
+                                asp-route-role="@Model.RoleFilter"
+                                asp-route-from="@Model.SubmittedFrom"
+                                asp-route-to="@Model.SubmittedTo"
+                                asp-route-pageNumber="@(Model.PageNumber + 1)"
+                                aria-label="Next page">›</a>
+                        }
+                        else
+                        {
+                            <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">›</span>
+                        }
+                    </nav>
+                }
+            </div>
+        </footer>
+    </div>
+</div>
+
+@if (Model.CanSubmitRequests)
+{
+    <partial name="_RecoverySubmitModal" model="Model.SubmitModal" />
+}
+
+<dialog class="sg-modal sg-recovery-review-modal" id="sg-recovery-review-modal" aria-labelledby="sg-recovery-review-title">
+    <div class="sg-modal-card sg-recovery-review-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-recovery-review-title">Review request</h2>
+                <p class="sg-modal-subtitle" id="sg-recovery-review-subtitle"></p>
+            </div>
+            <button class="sg-modal-close" type="button" data-recovery-review-close aria-label="Close review">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll sg-recovery-review-body">
+            <dl class="sg-recovery-review-summary" id="sg-recovery-review-summary">
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Status</dt>
+                    <dd id="sg-recovery-review-status"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Submitted</dt>
+                    <dd id="sg-recovery-review-created"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item" id="sg-recovery-review-reviewed-row" hidden>
+                    <dt>Reviewed</dt>
+                    <dd id="sg-recovery-review-reviewed"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Identity check</dt>
+                    <dd id="sg-recovery-review-method"></dd>
+                </div>
+                <div class="sg-recovery-review-summary-item">
+                    <dt>Requester</dt>
+                    <dd id="sg-recovery-review-requester"></dd>
+                </div>
+            </dl>
+            <section class="sg-recovery-review-block" aria-labelledby="sg-recovery-review-checks-label">
+                <h3 class="sg-recovery-review-block-title" id="sg-recovery-review-checks-label">Verification checklist</h3>
+                <div class="sg-recovery-review-checklist" id="sg-recovery-review-notes"></div>
+            </section>
+            <section class="sg-recovery-review-block" id="sg-recovery-review-decision-wrap" hidden aria-labelledby="sg-recovery-review-decision-label">
+                <h3 class="sg-recovery-review-block-title" id="sg-recovery-review-decision-label">Decision</h3>
+                <p class="sg-recovery-review-notes" id="sg-recovery-review-decision"></p>
+            </section>
+            <p class="sg-recovery-review-closed-note" id="sg-recovery-review-closed-note" hidden>
+                This request was already reviewed. You can view the details below; approve and reject are only available while status is Pending.
+            </p>
+            <div id="sg-recovery-review-actions" class="sg-recovery-review-actions" hidden>
+                <form method="post" asp-page-handler="Approve" class="sg-recovery-review-action sg-recovery-review-action--approve" id="sg-recovery-approve-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="" data-recovery-field="id" />
+                    <input type="hidden" name="search" value="@Model.Search" />
+                    <input type="hidden" name="status" value="@Model.StatusFilter" />
+                    <input type="hidden" name="role" value="@Model.RoleFilter" />
+                    <input type="hidden" name="from" value="@Model.SubmittedFrom" />
+                    <input type="hidden" name="to" value="@Model.SubmittedTo" />
+                    <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                    <h3 class="sg-recovery-review-action-title">Approve</h3>
+                    <p class="sg-recovery-review-action-lead">Revokes authenticator, recovery codes, and active sessions.</p>
+                    <div class="sg-field">
+                        <label class="sg-label" for="sg-recovery-approve-confirm">Confirmation</label>
+                        <input class="sg-input" id="sg-recovery-approve-confirm" name="confirmation" placeholder="APPROVE RESET" autocomplete="off" required />
+                    </div>
+                    <button class="sg-btn sg-recovery-review-action-btn" type="submit" data-submit>Approve request</button>
+                </form>
+                <form method="post" asp-page-handler="Reject" class="sg-recovery-review-action sg-recovery-review-action--reject" id="sg-recovery-reject-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="" data-recovery-field="id" />
+                    <input type="hidden" name="search" value="@Model.Search" />
+                    <input type="hidden" name="status" value="@Model.StatusFilter" />
+                    <input type="hidden" name="role" value="@Model.RoleFilter" />
+                    <input type="hidden" name="from" value="@Model.SubmittedFrom" />
+                    <input type="hidden" name="to" value="@Model.SubmittedTo" />
+                    <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                    <h3 class="sg-recovery-review-action-title">Reject</h3>
+                    <div class="sg-field">
+                        <label class="sg-label" for="sg-recovery-reject-reason">Reason</label>
+                        <select class="sg-select" id="sg-recovery-reject-reason" name="rejectionReason" required data-reject-reason>
+                            <option value="" disabled selected>Select a reason</option>
+                            @foreach (var option in RecoveryRejectionReasons.Options)
+                            {
+                                <option value="@option.Key">@option.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="sg-field" id="sg-recovery-reject-other-wrap" hidden data-reject-other-wrap>
+                        <label class="sg-label" for="sg-recovery-reject-other">Explanation</label>
+                        <textarea class="sg-textarea" id="sg-recovery-reject-other" name="rejectionOther" maxlength="500" rows="2" data-reject-other></textarea>
+                    </div>
+                    <button class="sg-btn-danger sg-recovery-review-action-btn" type="submit" data-submit>Reject request</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script src="~/js/recovery-submit.js" asp-append-version="true"></script>
+    <script src="~/js/admin-recovery.js" asp-append-version="true"></script>
 }

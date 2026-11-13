@@ -1,0 +1,90 @@
+@model SecureGate1.Models.RecoverySubmitModalModel
+<dialog class="sg-modal sg-recovery-submit-modal" id="sg-recovery-submit-modal" aria-labelledby="sg-recovery-submit-title">
+    <div class="sg-modal-card sg-recovery-submit-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-recovery-submit-title">Request reset</h2>
+                <p class="sg-modal-subtitle">An administrator must approve before the authenticator is restored.</p>
+            </div>
+            <button class="sg-modal-close" type="button" data-recovery-submit-close aria-label="Close">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll sg-recovery-submit-body">
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <p class="sg-inline-alert sg-inline-alert--error" role="alert">@Model.ErrorMessage</p>
+            }
+            <form method="post" asp-page-handler="Submit" class="sg-recovery-submit-form" id="sg-recovery-submit-form" novalidate>
+                @Html.AntiForgeryToken()
+                @if (Model.PreserveFilters is not null)
+                {
+                    <input type="hidden" name="search" value="@Model.PreserveFilters.Search" />
+                    <input type="hidden" name="status" value="@Model.PreserveFilters.Status" />
+                    <input type="hidden" name="role" value="@Model.PreserveFilters.Role" />
+                    <input type="hidden" name="from" value="@Model.PreserveFilters.From" />
+                    <input type="hidden" name="to" value="@Model.PreserveFilters.To" />
+                    <input type="hidden" name="pageNumber" value="@Model.PreserveFilters.PageNumber" />
+                }
+                <div class="sg-field">
+                    <label class="sg-label" for="sg-recovery-employee-query">Employee</label>
+                    <div class="sg-recovery-employee-picker" data-recovery-employee-picker>
+                        <input
+                            class="sg-input"
+                            type="search"
+                            id="sg-recovery-employee-query"
+                            autocomplete="off"
+                            placeholder="Search by name, email, or ID"
+                            data-recovery-employee-query
+                            aria-autocomplete="list"
+                            aria-controls="sg-recovery-employee-results"
+                            aria-expanded="false" />
+                        <input type="hidden" name="SubmitTargetUserId" id="SubmitTargetUserId" value="" data-recovery-employee-id required />
+                        <ul class="sg-recovery-employee-results" id="sg-recovery-employee-results" role="listbox" hidden data-recovery-employee-results></ul>
+                        <div class="sg-recovery-employee-selected" id="sg-recovery-employee-selected" hidden data-recovery-employee-selected>
+                            <p class="sg-recovery-employee-selected-name" data-recovery-selected-name></p>
+                            <p class="sg-recovery-employee-selected-meta" data-recovery-selected-meta></p>
+                            <button class="sg-btn-ghost sg-recovery-employee-change" type="button" data-recovery-employee-clear>Change</button>
+                        </div>
+                        <p class="sg-field-error" id="sg-recovery-employee-error" role="alert" hidden data-recovery-employee-error></p>
+                    </div>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="SubmitVerificationMethod">Identity check</label>
+                    <select class="sg-select" id="SubmitVerificationMethod" name="SubmitVerificationMethod" required>
+                        <option value="@VerificationMethods.InPerson">In person</option>
+                        <option value="@VerificationMethods.OrganizationRecord">Organization record</option>
+                        <option value="@VerificationMethods.ManagerConfirmation">Manager confirmation</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <span class="sg-label" id="sg-recovery-checks-label">What you checked</span>
+                    <ul class="sg-recovery-checklist" data-recovery-checklist" aria-labelledby="sg-recovery-checks-label">
+                        @foreach (var option in RecoveryVerificationChecks.Options)
+                        {
+                            <li>
+                                <label class="sg-recovery-check-option">
+                                    <input
+                                        type="checkbox"
+                                        name="SubmitChecks"
+                                        value="@option.Key"
+                                        data-recovery-check
+                                        @(option.Key == RecoveryVerificationChecks.Other ? "data-recovery-check-other" : "") />
+                                    <span>@option.Label</span>
+                                </label>
+                            </li>
+                        }
+                    </ul>
+                    <div class="sg-field" id="sg-recovery-other-wrap" hidden data-recovery-other-wrap>
+                        <label class="sg-label" for="SubmitOtherNotes">Explanation</label>
+                        <textarea class="sg-textarea" id="SubmitOtherNotes" name="SubmitOtherNotes" maxlength="500" rows="2" data-recovery-other-notes></textarea>
+                    </div>
+                </div>
+                <footer class="sg-recovery-submit-footer">
+                    <button class="sg-btn-secondary" type="button" data-recovery-submit-close>Cancel</button>
+                    <button class="sg-btn" type="submit" data-submit>Submit request</button>
+                </footer>
+            </form>
+        </div>
+    </div>
+</dialog>

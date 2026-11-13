@@ -15,7 +15,7 @@ public class SecurityPolicyOptions
     public int TotpPeriodSeconds { get; set; } = 30;
     public int TotpDriftSteps { get; set; } = 1;
     public int RecoveryCodeCount { get; set; } = 10;
-    public int PageSize { get; set; } = 25;
+    public int PageSize { get; set; } = 10;
     public int MaxPageSize { get; set; } = 100;
     public int MaxRequestBodyBytes { get; set; } = 65536;
     public int MaxAuditRangeDays { get; set; } = 366;

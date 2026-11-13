@@ -51,9 +51,22 @@ public class MfaService
 
     public async Task<bool> IsEnrolledAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return await _db.UserMfaSettings.AnyAsync(
-            s => s.UserId == userId && s.IsEnabled && s.ProtectedSecret != null,
+        return await HasUsableAuthenticatorAsync(userId, cancellationToken);
+    }
+
+    public async Task<bool> HasUsableAuthenticatorAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var row = await _db.UserMfaSettings.SingleOrDefaultAsync(
+            s => s.UserId == userId && s.IsEnabled,
             cancellationToken);
+        if (row?.ProtectedSecret is null)
+            return false;
+
+        if (TryUnprotectSecret(row.ProtectedSecret, out _))
+            return true;
+
+        await ClearUnreadableAuthenticatorAsync(userId, cancellationToken);
+        return false;
     }
 
     public EnrollmentChallenge BeginEnrollment(string userId, string accountName)
@@ -160,14 +173,11 @@ public class MfaService
         if (row?.ProtectedSecret is null)
             return ServiceResult.Fail("Multi-factor authentication is not enrolled for this account.");
 
-        byte[] secret;
-        try
+        if (!TryUnprotectSecret(row.ProtectedSecret, out var secret))
         {
-            secret = Convert.FromBase64String(_secrets.Unprotect(row.ProtectedSecret));
-        }
-        catch (Exception ex) when (ex is CryptographicException or FormatException)
-        {
-            return ServiceResult.Fail("Multi-factor authentication is unavailable for this account. Ask an administrator to reset it.");
+            await ClearUnreadableAuthenticatorAsync(user.Id, cancellationToken);
+            return ServiceResult.FailReset(
+                "The authenticator on this account could not be read. Set it up again.");
         }
 
         var matched = _totp.Verify(secret, code, _time.GetUtcNow(), row.LastAcceptedTimeStep);
@@ -247,6 +257,34 @@ public class MfaService
         row.LastAcceptedTimeStep = null;
         row.LastVerifiedAtUtc = null;
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private bool TryUnprotectSecret(string protectedSecret, out byte[] secret)
+    {
+        secret = [];
+        try
+        {
+            secret = Convert.FromBase64String(_secrets.Unprotect(protectedSecret));
+            return secret.Length > 0;
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            return false;
+        }
+    }
+
+    private async Task ClearUnreadableAuthenticatorAsync(string userId, CancellationToken cancellationToken)
+    {
+        await ClearBindingAsync(userId, cancellationToken);
+        await _audit.WriteAsync(new AuditWrite
+        {
+            EventType = EventTypes.MfaResetApproved,
+            Outcome = Outcomes.Success,
+            Severity = Severities.High,
+            ActorUserId = userId,
+            TargetUserId = userId,
+            Details = "Authenticator secret could not be decrypted. Enrollment was cleared so the account can set it up again."
+        }, cancellationToken);
     }
 
     private async Task RegisterTotpFailureAsync(string userId, SecuritySettings settings, string details, CancellationToken cancellationToken)

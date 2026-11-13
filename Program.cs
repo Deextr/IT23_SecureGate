@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
@@ -14,7 +15,10 @@ using Microsoft.Extensions.Options;
 using SecureGate1.Data;
 using SecureGate1.Models;
 using SecureGate1.Security;
+using QuestPDF.Infrastructure;
 using SecureGate1.Services;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +26,16 @@ var policy = builder.Configuration.GetSection(SecurityPolicyOptions.SectionName)
 var policyErrors = SecurityPolicyOptions.Validate(policy);
 if (policyErrors.Count > 0)
     throw new InvalidOperationException("SecurityPolicy configuration is invalid. " + string.Join(" ", policyErrors));
+
+var useSecureCookies = builder.Configuration.GetValue("Hosting:UseSecureCookies", true);
+var cookieSecurePolicy = useSecureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 byte[] recoveryKey;
 try
@@ -39,17 +53,21 @@ if (recoveryKey.Length < 32)
         "Set RecoveryCodes:HmacKey to a base64-encoded key of at least 32 bytes. Example: dotnet user-secrets set \"RecoveryCodes:HmacKey\" \"<value>\"");
 }
 
-var keyPath = builder.Configuration["DataProtection:KeyPath"];
-if (string.IsNullOrWhiteSpace(keyPath))
-{
-    keyPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SecureGate", "keys");
-}
+var configuredKeyPath = builder.Configuration["DataProtection:KeyPath"];
+var keyPath = string.IsNullOrWhiteSpace(configuredKeyPath)
+    ? Path.Combine(builder.Environment.ContentRootPath, "AppData", "dp-keys")
+    : Path.IsPathRooted(configuredKeyPath)
+        ? configuredKeyPath
+        : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, configuredKeyPath));
 
 Directory.CreateDirectory(keyPath);
 var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
     .SetApplicationName("SecureGate");
-if (OperatingSystem.IsWindows())
+var protectKeysWithDpapi = builder.Configuration.GetValue(
+    "Hosting:ProtectDataProtectionKeysWithDpapi",
+    builder.Environment.IsDevelopment());
+if (OperatingSystem.IsWindows() && protectKeysWithDpapi)
     dataProtection.ProtectKeysWithDpapi();
 
 builder.WebHost.ConfigureKestrel(kestrel => kestrel.Limits.MaxRequestBodySize = policy.MaxRequestBodyBytes);
@@ -128,7 +146,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "SecureGate.Auth";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(policy.SessionIdleMinutes);
     options.SlidingExpiration = true;
@@ -136,17 +154,26 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
     options.Events.OnRedirectToAccessDenied = async context =>
     {
-        var audit = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
-        var userId = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        await audit.WriteAsync(new AuditWrite
+        try
         {
-            EventType = EventTypes.AccessDenied,
-            Outcome = Outcomes.Denied,
-            Severity = Severities.High,
-            ActorUserId = userId,
-            TargetUserId = userId,
-            Details = "Path=" + (context.Request.Path.Value ?? "/")
-        });
+            var audit = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
+            var userId = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await audit.WriteAsync(new AuditWrite
+            {
+                EventType = EventTypes.AccessDenied,
+                Outcome = Outcomes.Denied,
+                Severity = Severities.High,
+                ActorUserId = userId,
+                TargetUserId = userId,
+                Details = "Path=" + (context.Request.Path.Value ?? "/")
+            });
+        }
+        catch (Exception ex)
+        {
+            var logger = context.HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("SecureGate.AccessDenied");
+            logger?.LogError(ex, "Could not write access-denied audit.");
+        }
+
         context.Response.Redirect(context.RedirectUri);
     };
     options.Events.OnValidatePrincipal = ValidateSessionAsync;
@@ -157,7 +184,7 @@ builder.Services.AddAuthentication()
     {
         options.Cookie.Name = "SecureGate.PreAuth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SecurePolicy = cookieSecurePolicy;
         options.Cookie.SameSite = SameSiteMode.Strict;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(policy.PreAuthMinutes);
         options.SlidingExpiration = false;
@@ -167,7 +194,7 @@ builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = "SecureGate.Antiforgery";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.Cookie.SameSite = SameSiteMode.Strict;
 });
 
@@ -176,14 +203,26 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, token) =>
     {
-        var audit = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
-        await audit.WriteAsync(new AuditWrite
+        try
         {
-            EventType = EventTypes.IpRateLimited,
-            Outcome = Outcomes.Denied,
-            Severity = Severities.Medium,
-            Details = "Authentication endpoint rate limit reached."
-        }, token);
+            var audit = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
+            await audit.WriteAsync(new AuditWrite
+            {
+                EventType = EventTypes.IpRateLimited,
+                Outcome = Outcomes.Denied,
+                Severity = Severities.Medium,
+                Details = "Authentication endpoint rate limit reached."
+            }, token);
+        }
+        catch (Exception ex)
+        {
+            var logger = context.HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("SecureGate.RateLimit");
+            logger?.LogError(ex, "Could not write rate-limit audit.");
+        }
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
+
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         context.HttpContext.Response.ContentType = "text/html; charset=utf-8";
         await context.HttpContext.Response.WriteAsync(
@@ -197,14 +236,15 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("auth-endpoints", httpContext =>
     {
         var current = httpContext.RequestServices.GetRequiredService<IOptions<SecurityPolicyOptions>>().Value;
-        return RateLimitPartition.GetSlidingWindowLimiter(
-            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new SlidingWindowRateLimiterOptions
+        var clientKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            clientKey,
+            _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = current.IpPermitLimit,
                 Window = TimeSpan.FromMinutes(current.IpWindowMinutes),
-                SegmentsPerWindow = 5,
-                QueueLimit = 0
+                QueueLimit = 0,
+                AutoReplenishment = true
             });
     });
 });
@@ -222,6 +262,7 @@ builder.Services.AddScoped<StepUpGuard>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<MfaResetService>();
 builder.Services.AddScoped<MonitoringService>();
+builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ProfilePhotoService>();
 
 builder.Services.AddRazorPages(options =>
@@ -233,6 +274,7 @@ builder.Services.AddRazorPages(options =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler("/Error");
 if (!app.Environment.IsDevelopment())
     app.UseHsts();

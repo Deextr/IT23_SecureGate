@@ -1,12 +1,31 @@
+# Build output
 bin/
 obj/
-.vs/
-*.user
-*.suo
-appsettings.*.local.json
-secrets.json
+artifacts/
 TestResults/
 .dotnet/
 *.nupkg
+
+# IDE / Visual Studio
+.vs/
+*.user
+*.suo
+
+# --- Sensitive: never commit these ---
+
+# Web Deploy / publish (passwords live here)
+*WebDeploy.publishSettings
+*.publishSettings
+Properties/PublishProfiles/*.pubxml.user
+
+# App settings that contain passwords, API keys, or host-specific connection strings
+appsettings.Production.json
+appsettings.*.local.json
+appsettings.Local.json
+appsettings.Secrets.json
+secrets.json
+
+# Runtime data (uploads, data-protection keys on disk)
 AppData/uploads/**/*
+AppData/dp-keys/**/*
 !AppData/uploads/profiles/.gitkeep

@@ -1,32 +1,49 @@
-using Microsoft.AspNetCore.Identity;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SecureGate1.Models;
-using SecureGate1.Security;
 using SecureGate1.Services;
 
 namespace SecureGate1.Pages.Dashboard;
 
 public class IndexModel : PageModel
 {
-    private readonly UserManager<ApplicationUser> _users;
-    private readonly MonitoringService _monitoring;
-
-    public IndexModel(UserManager<ApplicationUser> users, MonitoringService monitoring)
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        _users = users;
-        _monitoring = monitoring;
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private readonly DashboardService _dashboard;
+
+    public IndexModel(DashboardService dashboard)
+    {
+        _dashboard = dashboard;
     }
 
-    public string DisplayName { get; private set; } = "";
-    public string RoleName { get; private set; } = "";
-    public DashboardSummary Summary { get; private set; } = new();
+    public DashboardPayload Payload { get; private set; } = new();
+    public DashboardKind Kind { get; private set; }
+    public string PayloadJson { get; private set; } = "{}";
 
-    public async Task OnGetAsync(CancellationToken cancellationToken)
+    public async Task OnGetAsync(string? preset, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
     {
-        var user = await _users.GetUserAsync(User);
-        DisplayName = user?.DisplayName ?? User.Identity?.Name ?? "there";
-        var roles = user is null ? [] : await _users.GetRolesAsync(user);
-        RoleName = string.Join(", ", roles.Select(Roles.DisplayName));
-        Summary = await _monitoring.GetDashboardAsync(cancellationToken);
+        Kind = _dashboard.KindFor(User);
+        Payload = await _dashboard.GetAsync(User, preset, from, to, cancellationToken);
+        PayloadJson = JsonSerializer.Serialize(Payload, JsonOptions);
+        ViewData["Title"] = "Dashboard";
+    }
+
+    public async Task<IActionResult> OnGetRefreshAsync(string? preset, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var payload = await _dashboard.GetAsync(User, preset, from, to, cancellationToken);
+            return new JsonResult(payload, JsonOptions);
+        }
+        catch (Exception)
+        {
+            return new JsonResult(new DashboardPayload { Error = "Dashboard data could not be loaded." }, JsonOptions)
+            {
+                StatusCode = StatusCodes.Status500InternalServerError
+            };
+        }
     }
 }

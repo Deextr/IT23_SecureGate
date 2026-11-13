@@ -42,6 +42,9 @@ public class ReauthenticateModel : PageModel
             return RedirectToPage("Login");
 
         var result = await _mfa.VerifyAsync(user, Code, cancellationToken);
+        if (result.RequiresAuthenticatorReset)
+            return RedirectToPage("Login");
+
         if (!result.Succeeded)
         {
             Error = result.Message;

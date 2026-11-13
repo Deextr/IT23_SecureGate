@@ -1,0 +1,34 @@
+@page
+@using SecureGate1.Models
+@model SecureGate1.Pages.MfaResets.IndexModel
+@{
+    ViewData["Title"] = "Recovery";
+    var openSubmit = TempData["OpenSubmitModal"] is not null
+        || string.Equals(Request.Query["submit"], "open", StringComparison.OrdinalIgnoreCase);
+}
+<p class="sg-lede">Submit a recovery request when an employee lost both the authenticator and recovery codes. An administrator must approve before the authenticator is reset.</p>
+
+<div
+    class="sg-recovery-officer"
+    data-recovery-submit-root
+    data-employee-search-url="@Url.Page("/MfaResets/EmployeeSearch")"
+    @(openSubmit ? "data-open-submit-request" : "")>
+    <section class="sg-card sg-recovery-officer-card">
+        <h2 class="sg-recovery-officer-heading">Request a reset</h2>
+        <p class="sg-help">You can submit requests here. You cannot review, approve, or reject requests—that is limited to administrators.</p>
+        <button class="sg-btn" type="button" data-recovery-submit-open>Request reset</button>
+    </section>
+</div>
+
+@{
+    var submitModal = new RecoverySubmitModalModel
+    {
+        ErrorMessage = TempData["SubmitRequestError"] as string
+    };
+}
+<partial name="_RecoverySubmitModal" model="submitModal" />
+
+@section Scripts {
+    <script src="~/js/recovery-submit.js" asp-append-version="true"></script>
+    <script src="~/js/recovery-officer.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,73 @@
+@model SecureGate1.Services.OfficerDashboardDto
+<div class="sg-dash-metrics" aria-label="Security overview">
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Unacknowledged</h3>
+        <p class="sg-dash-metric-value" data-kpi="unacknowledgedAlerts">@Model.UnacknowledgedAlerts</p>
+        <p class="sg-dash-metric-caption">Open alerts awaiting review</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Unresolved</h3>
+        <p class="sg-dash-metric-value" data-kpi="openAlerts">@Model.OpenAlerts</p>
+        <p class="sg-dash-metric-caption"><span data-kpi="highPriorityOpen">@Model.HighPriorityOpen</span> high or critical</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Investigations</h3>
+        <p class="sg-dash-metric-value" data-kpi="ongoingInvestigations">@Model.OngoingInvestigations</p>
+        <p class="sg-dash-metric-caption"><span data-kpi="pendingInvestigations">@Model.PendingInvestigations</span> pending to start</p>
+    </article>
+    <article class="sg-dash-metric">
+        <h3 class="sg-dash-metric-label">Alerts in range</h3>
+        <p class="sg-dash-metric-value" data-kpi="alertsInRange">@Model.AlertsInRange</p>
+        <p class="sg-dash-metric-caption"><span data-kpi="resolvedInvestigationsInRange">@Model.ResolvedInvestigationsInRange</span> investigations closed in range</p>
+    </article>
+</div>
+
+<section class="sg-card sg-dash-hero-chart">
+    <h2 class="sg-dash-section-title">Alert volume</h2>
+    <p class="sg-dash-section-hint">Alerts created in the selected range</p>
+    <div class="sg-dash-chart-frame" data-chart-empty="alertTrend">
+        <canvas data-chart="alertTrend" data-chart-type="line" width="960" height="280" aria-label="Alert trend"></canvas>
+    </div>
+</section>
+
+<div class="sg-dash-split">
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">In this period</h2>
+        <dl class="sg-dash-summary">
+            <div><dt>Alerts recorded</dt><dd data-kpi="alertsInRange">@Model.AlertsInRange</dd></div>
+            <div><dt>Investigations resolved</dt><dd data-kpi="resolvedInvestigationsInRange">@Model.ResolvedInvestigationsInRange</dd></div>
+            <div><dt>Pending investigations</dt><dd data-kpi="pendingInvestigations">@Model.PendingInvestigations</dd></div>
+            <div><dt>In progress</dt><dd data-kpi="ongoingInvestigations">@Model.OngoingInvestigations</dd></div>
+        </dl>
+    </section>
+    <section class="sg-card sg-dash-panel">
+        <h2 class="sg-dash-section-title">Needs attention</h2>
+        <p class="sg-dash-section-hint">Current backlog</p>
+        <ul class="sg-dash-attention">
+            <li>
+                <a class="sg-dash-attention-link@(Model.UnacknowledgedAlerts > 0 ? " is-highlight" : "")" asp-page="/Monitoring/SecurityOperations/Index">
+                    <span>Unacknowledged alerts</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="unacknowledgedAlerts">@Model.UnacknowledgedAlerts</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+            <li>
+                <a class="sg-dash-attention-link@(Model.HighPriorityOpen > 0 ? " is-highlight" : "")" asp-page="/Monitoring/SecurityOperations/Index" asp-route-severity="High">
+                    <span>High-priority alerts</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="highPriorityOpen">@Model.HighPriorityOpen</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+            <li>
+                <a class="sg-dash-attention-link@(Model.PendingInvestigations > 0 ? " is-highlight" : "")" asp-page="/Monitoring/SecurityOperations/Index" asp-route-section="investigations">
+                    <span>New investigations</span>
+                    <span class="sg-dash-attention-end"><span class="sg-dash-attention-count" data-kpi="pendingInvestigations">@Model.PendingInvestigations</span><span class="sg-dash-chevron" aria-hidden="true"></span></span>
+                </a>
+            </li>
+        </ul>
+    </section>
+</div>
+
+<section class="sg-card sg-dash-panel sg-dash-panel-wide">
+    <h2 class="sg-dash-section-title">Recent activity</h2>
+    <div data-list="recentSecurityActivity"></div>
+    <noscript>@await Html.PartialAsync("_DashboardFeedStatic", Model.RecentSecurityActivity)</noscript>
+</section>

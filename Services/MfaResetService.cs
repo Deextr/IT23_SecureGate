@@ -31,11 +31,40 @@ public class MfaResetService
         _time = time;
     }
 
+    public async Task<IReadOnlyList<MfaResetEmployeeSearchItem>> SearchEmployeesAsync(
+        string? query,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
+            return [];
+
+        limit = Math.Clamp(limit, 1, 25);
+        var term = query.Trim();
+
+        return await _db.Users.AsNoTracking()
+            .Where(u => u.IsActive && (
+                u.DisplayName.Contains(term)
+                || (u.Email != null && u.Email.Contains(term))
+                || (u.UserName != null && u.UserName.Contains(term))
+                || u.Id.Contains(term)))
+            .OrderBy(u => u.DisplayName)
+            .Take(limit)
+            .Select(u => new MfaResetEmployeeSearchItem
+            {
+                Id = u.Id,
+                DisplayName = u.DisplayName,
+                Email = u.Email ?? ""
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ServiceResult> SubmitAsync(
         string actorId,
         string targetId,
         string verificationMethod,
-        string notes,
+        IReadOnlyList<string> verificationChecks,
+        string? otherNotes,
         CancellationToken cancellationToken = default)
     {
         var actor = await _users.FindByIdAsync(actorId);
@@ -49,9 +78,13 @@ public class MfaResetService
         if (!VerificationMethods.All.Contains(verificationMethod))
             return ServiceResult.Fail("Choose how the employee's identity was verified.");
 
-        var cleanNotes = AuditService.Clean(notes, 2000) ?? "";
+        var checkError = RecoveryNotesFormatter.ValidateChecks(verificationChecks, otherNotes);
+        if (checkError is not null)
+            return checkError;
+
+        var cleanNotes = AuditService.CleanMultiline(RecoveryNotesFormatter.BuildStorageNotes(verificationChecks, otherNotes), 2000) ?? "";
         if (cleanNotes.Length < 10)
-            return ServiceResult.Fail("Describe the identity check in at least 10 characters. Do not rely on the employee's own email.");
+            return ServiceResult.Fail("Complete the verification checklist before submitting.");
 
         var target = await _users.FindByIdAsync(targetId);
         if (target is not { IsActive: true })
@@ -135,7 +168,12 @@ public class MfaResetService
         return ServiceResult.Ok("Authenticator reset. The employee must enroll again at the next sign-in.");
     }
 
-    public async Task<ServiceResult> RejectAsync(string actorId, long requestId, string? decisionNotes, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult> RejectAsync(
+        string actorId,
+        long requestId,
+        string? rejectionReason,
+        string? rejectionOther,
+        CancellationToken cancellationToken = default)
     {
         var actor = await _users.FindByIdAsync(actorId);
         if (actor is not { IsActive: true }
@@ -146,9 +184,12 @@ public class MfaResetService
         if (request is null || request.Status != ResetRequestStatuses.Pending)
             return ServiceResult.Fail("That request is no longer pending.");
 
-        var notes = AuditService.Clean(decisionNotes, 2000) ?? "";
-        if (notes.Length < 5)
-            return ServiceResult.Fail("Add a short reason for the rejection.");
+        var validation = RecoveryRejectionFormatter.Validate(rejectionReason, rejectionOther);
+        if (validation is not null)
+            return validation;
+
+        var reasonKey = rejectionReason!.Trim();
+        var notes = AuditService.Clean(RecoveryRejectionFormatter.BuildNotes(reasonKey, rejectionOther), 2000) ?? "";
 
         request.Status = ResetRequestStatuses.Rejected;
         request.ReviewerUserId = actor.Id;
@@ -164,5 +205,134 @@ public class MfaResetService
             Details = "Recovery request rejected."
         }, cancellationToken);
         return ServiceResult.Ok("Recovery request rejected.");
+    }
+
+    public Task<int> CountAsync(
+        string? search,
+        string? status,
+        string? targetRole,
+        DateTime? submittedFromUtc,
+        DateTime? submittedToExclusiveUtc,
+        CancellationToken cancellationToken = default) =>
+        FilteredRequests(search, status, targetRole, submittedFromUtc, submittedToExclusiveUtc)
+            .CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MfaResetListItem>> ListAsync(
+        string? search,
+        string? status,
+        string? targetRole,
+        DateTime? submittedFromUtc,
+        DateTime? submittedToExclusiveUtc,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await FilteredRequests(search, status, targetRole, submittedFromUtc, submittedToExclusiveUtc)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new
+            {
+                r.MfaResetRequestId,
+                r.CreatedAtUtc,
+                r.ReviewedAtUtc,
+                r.Status,
+                r.VerificationMethod,
+                r.Notes,
+                r.DecisionNotes,
+                r.TargetUserId,
+                TargetDisplayName = r.TargetUser.DisplayName,
+                TargetEmail = r.TargetUser.Email,
+                RequesterUserId = r.RequesterUserId,
+                RequesterDisplayName = r.RequesterUser.DisplayName,
+                RequesterEmail = r.RequesterUser.Email
+            })
+            .ToListAsync(cancellationToken);
+
+        var targetIds = rows.Select(r => r.TargetUserId).Distinct().ToList();
+        var roles = await RolesForUsersAsync(targetIds, cancellationToken);
+
+        return rows.Select(r => new MfaResetListItem
+        {
+            MfaResetRequestId = r.MfaResetRequestId,
+            CreatedAtUtc = r.CreatedAtUtc,
+            ReviewedAtUtc = r.ReviewedAtUtc,
+            Status = r.Status,
+            VerificationMethod = r.VerificationMethod,
+            Notes = r.Notes,
+            DecisionNotes = r.DecisionNotes,
+            TargetUserId = r.TargetUserId,
+            TargetDisplayName = r.TargetDisplayName,
+            TargetEmail = r.TargetEmail,
+            TargetRole = roles.TryGetValue(r.TargetUserId, out var role) ? role : "",
+            RequesterUserId = r.RequesterUserId,
+            RequesterDisplayName = r.RequesterDisplayName,
+            RequesterEmail = r.RequesterEmail
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> RolesForUsersAsync(
+        IEnumerable<string> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<string, string>();
+
+        var pairs = await (
+            from userRole in _db.UserRoles
+            join role in _db.Roles on userRole.RoleId equals role.Id
+            where ids.Contains(userRole.UserId)
+            select new { userRole.UserId, role.Name }
+        ).ToListAsync(cancellationToken);
+
+        return pairs
+            .GroupBy(p => p.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Name).FirstOrDefault(n => !string.IsNullOrEmpty(n)) ?? "");
+    }
+
+    private IQueryable<MfaResetRequest> FilteredRequests(
+        string? search,
+        string? status,
+        string? targetRole,
+        DateTime? submittedFromUtc,
+        DateTime? submittedToExclusiveUtc)
+    {
+        var query = _db.MfaResetRequests
+            .AsNoTracking()
+            .Include(r => r.TargetUser)
+            .Include(r => r.RequesterUser)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(r =>
+                r.TargetUser.DisplayName.Contains(term)
+                || (r.TargetUser.Email != null && r.TargetUser.Email.Contains(term))
+                || r.RequesterUser.DisplayName.Contains(term)
+                || (r.RequesterUser.Email != null && r.RequesterUser.Email.Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(r => r.Status == status);
+
+        if (submittedFromUtc.HasValue)
+            query = query.Where(r => r.CreatedAtUtc >= submittedFromUtc.Value);
+
+        if (submittedToExclusiveUtc.HasValue)
+            query = query.Where(r => r.CreatedAtUtc < submittedToExclusiveUtc.Value);
+
+        if (!string.IsNullOrWhiteSpace(targetRole))
+        {
+            var roleUserIds = (
+                from userRole in _db.UserRoles
+                join role in _db.Roles on userRole.RoleId equals role.Id
+                where role.Name == targetRole
+                select userRole.UserId);
+            query = query.Where(r => roleUserIds.Contains(r.TargetUserId));
+        }
+
+        return query;
     }
 }

@@ -1,0 +1,319 @@
+@page
+@using System.Text.Json
+@using SecureGate1.Models
+@using SecureGate1.Services
+@model SecureGate1.Pages.Monitoring.SecurityOperations.IndexModel
+@{
+    ViewData["Title"] = "Security Operations";
+    string InvLabel(string? status) => status is null ? "—" : IndexModel.InvestigationStatusLabel(status);
+}
+<p class="sg-lede">Review security alerts and manage investigations from one place. Times use your local timezone and 12-hour clock.</p>
+
+<div class="sg-accounts sg-secops sg-audit-logs" data-security-operations>
+    <section class="sg-accounts-card sg-audit-filter-card" aria-labelledby="sg-secops-filters-heading">
+        <header class="sg-audit-filter-card-header">
+            <div>
+                <h2 class="sg-audit-filter-card-title" id="sg-secops-filters-heading">Filters</h2>
+                <p class="sg-audit-filter-card-hint">Search and dates work with alert status, severity, and investigation fields.</p>
+            </div>
+            @if (Model.HasActiveFilters)
+            {
+                <div class="sg-audit-filter-card-actions">
+                    <a class="sg-btn-ghost sg-audit-clear-filters" asp-page="Index">Clear all</a>
+                </div>
+            }
+        </header>
+
+        <form method="get" class="sg-audit-filter-form" id="sg-secops-filter-form">
+            <input type="hidden" name="pageNumber" value="1" />
+
+            <div class="sg-audit-filter-row sg-audit-filter-row--primary">
+                <div class="sg-field sg-audit-filter-search">
+                    <label class="sg-label" for="search">Search</label>
+                    <div class="sg-accounts-search sg-audit-search-control">
+                        <span class="sg-accounts-search-icon" aria-hidden="true"><vc:sg-icon name="search" /></span>
+                        <input
+                            class="sg-input sg-accounts-search-input"
+                            id="search"
+                            name="search"
+                            value="@Model.Search"
+                            maxlength="100"
+                            placeholder="Title, rule, IP, or investigation notes…"
+                            autocomplete="off" />
+                    </div>
+                </div>
+                <div class="sg-field sg-audit-filter-dates">
+                    <span class="sg-label" id="sg-secops-date-label">Generated date range</span>
+                    <div class="sg-audit-date-inputs" role="group" aria-labelledby="sg-secops-date-label">
+                        <label class="sg-visually-hidden" for="from">From date</label>
+                        <input class="sg-input sg-audit-date-input" type="date" id="from" name="from" value="@Model.From" data-date-range="from" />
+                        <span class="sg-recovery-date-sep" aria-hidden="true">to</span>
+                        <label class="sg-visually-hidden" for="to">To date</label>
+                        <input class="sg-input sg-audit-date-input" type="date" id="to" name="to" value="@Model.To" data-date-range="to" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="sg-audit-filter-row sg-audit-filter-row--grid">
+                <div class="sg-field">
+                    <label class="sg-label" for="status">Alert status</label>
+                    <select class="sg-select" id="status" name="status" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Status))">Unresolved</option>
+                        <option value="@AlertStatuses.Open" selected="@(Model.Status == AlertStatuses.Open)">Open</option>
+                        <option value="@AlertStatuses.Resolved" selected="@(Model.Status == AlertStatuses.Resolved)">Resolved</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="severity">Severity</label>
+                    <select class="sg-select" id="severity" name="severity" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Severity))">All severities</option>
+                        <option value="@Severities.Critical" selected="@(Model.Severity == Severities.Critical)">Critical</option>
+                        <option value="@Severities.High" selected="@(Model.Severity == Severities.High)">High</option>
+                        <option value="@Severities.Medium" selected="@(Model.Severity == Severities.Medium)">Medium</option>
+                        <option value="@Severities.Low" selected="@(Model.Severity == Severities.Low)">Low</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="inv">Investigation</label>
+                    <select class="sg-select" id="inv" name="inv" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.InvestigationLink))">Any</option>
+                        <option value="none" selected="@(Model.InvestigationLink == "none")">No investigation</option>
+                        <option value="any" selected="@(Model.InvestigationLink == "any")">Has investigation</option>
+                        <option value="@InvestigationStatuses.Open" selected="@(Model.InvestigationLink == InvestigationStatuses.Open)">Investigation open</option>
+                        <option value="@InvestigationStatuses.InProgress" selected="@(Model.InvestigationLink == InvestigationStatuses.InProgress)">In progress</option>
+                        <option value="@InvestigationStatuses.Closed" selected="@(Model.InvestigationLink == InvestigationStatuses.Closed)">Investigation closed</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sg-audit-filter-row sg-audit-filter-row--grid">
+                <div class="sg-field">
+                    <label class="sg-label" for="invStatus">Investigation status</label>
+                    <select class="sg-select" id="invStatus" name="invStatus" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.InvestigationStatus))">Any status</option>
+                        <option value="@InvestigationStatuses.Open" selected="@(Model.InvestigationStatus == InvestigationStatuses.Open)">Open</option>
+                        <option value="@InvestigationStatuses.InProgress" selected="@(Model.InvestigationStatus == InvestigationStatuses.InProgress)">In progress</option>
+                        <option value="@InvestigationStatuses.Closed" selected="@(Model.InvestigationStatus == InvestigationStatuses.Closed)">Closed</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="assigned">Assigned officer</label>
+                    <select class="sg-select" id="assigned" name="assigned" data-auto-submit>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.AssignedOfficerId))">All officers</option>
+                        @foreach (var officer in Model.Officers)
+                        {
+                            <option value="@officer.Id" selected="@(Model.AssignedOfficerId == officer.Id)">@officer.DisplayName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    @if (Model.DateError is not null)
+    {
+        <div class="sg-banner sg-banner-error" role="alert">@Model.DateError</div>
+    }
+
+    <div class="sg-accounts-card">
+        <div class="sg-table-wrap">
+            <table class="sg-table sg-accounts-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Generated</th>
+                        <th scope="col">Alert</th>
+                        <th scope="col">Severity</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Investigation</th>
+                        <th scope="col" class="sg-secops-col-menu"><span class="sg-visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.DateError is not null || Model.Results.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="sg-empty">@(Model.DateError is not null ? "Fix the date range to view alerts." : "No matching alerts.")</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var item in Model.Results.Items)
+                    {
+                        var alert = item.Alert;
+                        var statusLabel = IndexModel.AlertStatusLabel(alert.Status);
+                        var isResolved = alert.Status == AlertStatuses.Resolved;
+                        var rowJson = JsonSerializer.Serialize(new
+                        {
+                            alertId = alert.AlertId,
+                            title = alert.Title,
+                            ruleKey = alert.RuleKey,
+                            severity = alert.Severity,
+                            status = statusLabel,
+                            createdAt = DisplayTime.Local(alert.CreatedAtUtc),
+                            resolvedAt = DisplayTime.Local(alert.ResolvedAtUtc),
+                            sourceIp = alert.SourceIp ?? "",
+                            investigationStatus = item.InvestigationStatus ?? "",
+                            investigationNotes = item.InvestigationNotes ?? "",
+                            isResolved
+                        });
+                        <tr
+                            class="sg-accounts-row"
+                            data-secops-row="@rowJson"
+                            tabindex="0"
+                            role="button"
+                            aria-label="View alert @alert.Title"
+                            aria-haspopup="dialog">
+                            <td class="sg-accounts-date">@DisplayTime.Local(alert.CreatedAtUtc)</td>
+                            <td>
+                                <span class="sg-accounts-name">@alert.Title</span>
+                                <span class="sg-accounts-email">@alert.RuleKey</span>
+                            </td>
+                            <td><span class="sg-badge @IndexModel.SeverityBadgeClass(alert.Severity)">@alert.Severity</span></td>
+                            <td><span class="sg-badge @IndexModel.AlertStatusBadgeClass(alert.Status)">@statusLabel</span></td>
+                            <td>
+                                @if (item.InvestigationStatus is null)
+                                {
+                                    <span class="sg-help">None</span>
+                                }
+                                else
+                                {
+                                    <span class="sg-badge @IndexModel.InvestigationStatusBadgeClass(item.InvestigationStatus)">@InvLabel(item.InvestigationStatus)</span>
+                                }
+                            </td>
+                            <td class="sg-secops-col-menu">
+                                @if (!isResolved)
+                                {
+                                    <div class="sg-row-menu" data-row-menu>
+                                        <button
+                                            type="button"
+                                            class="sg-row-menu-trigger"
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            aria-label="Actions for @alert.Title"
+                                            title="Actions">
+                                            <span class="sg-row-menu-glyph" aria-hidden="true">⋮</span>
+                                        </button>
+                                        <div class="sg-row-menu-panel" role="menu" hidden>
+                                            <button type="button" class="sg-row-menu-item" role="menuitem" data-secops-resolve>Resolve</button>
+                                            <button type="button" class="sg-row-menu-item" role="menuitem" data-secops-investigate>Investigate</button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="sg-help" title="Resolved alerts cannot be investigated or changed.">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.DateError is null && Model.Results.Total > 0)
+        {
+            <footer class="sg-accounts-footer">
+                <p class="sg-accounts-range">Showing @Model.RangeStart–@Model.RangeEnd of @Model.Results.Total results</p>
+                <div class="sg-accounts-pager">
+                    <span class="sg-accounts-page-size">Rows per page: @Model.PageSize</span>
+                    @if (Model.Results.TotalPages > 1)
+                    {
+                        <nav class="sg-accounts-pages" aria-label="Pagination">
+                            @if (Model.PageNumber > 1)
+                            {
+                                <a class="sg-accounts-page-btn" asp-page="Index" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-severity="@Model.Severity" asp-route-inv="@Model.InvestigationLink" asp-route-invStatus="@Model.InvestigationStatus" asp-route-assigned="@Model.AssignedOfficerId" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-pageNumber="@(Model.PageNumber - 1)" aria-label="Previous page">‹</a>
+                            }
+                            else
+                            {
+                                <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">‹</span>
+                            }
+                            <span class="sg-accounts-page-btn is-current" aria-current="page">@Model.PageNumber</span>
+                            @if (Model.PageNumber < Model.Results.TotalPages)
+                            {
+                                <a class="sg-accounts-page-btn" asp-page="Index" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-severity="@Model.Severity" asp-route-inv="@Model.InvestigationLink" asp-route-invStatus="@Model.InvestigationStatus" asp-route-assigned="@Model.AssignedOfficerId" asp-route-from="@Model.From" asp-route-to="@Model.To" asp-route-pageNumber="@(Model.PageNumber + 1)" aria-label="Next page">›</a>
+                            }
+                            else
+                            {
+                                <span class="sg-accounts-page-btn is-disabled" aria-hidden="true">›</span>
+                            }
+                        </nav>
+                    }
+                </div>
+            </footer>
+        }
+    </div>
+</div>
+
+<form method="post" asp-page-handler="Resolve" id="sg-secops-resolve-form" class="sg-visually-hidden" aria-hidden="true">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" id="sg-secops-resolve-id" value="" />
+    <partial name="_SecOpsRouteHiddens" model="Model" />
+</form>
+
+<dialog class="sg-modal sg-secops-detail-modal" id="sg-secops-alert-modal" aria-labelledby="sg-secops-alert-title">
+    <div class="sg-modal-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-secops-alert-title">Alert</h2>
+                <p class="sg-modal-subtitle" id="sg-secops-alert-subtitle"></p>
+            </div>
+            <button class="sg-modal-close" type="button" data-secops-alert-close aria-label="Close">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll">
+            <dl class="sg-recovery-review-summary">
+                <div class="sg-recovery-review-summary-item"><dt>Generated</dt><dd id="sg-secops-alert-created"></dd></div>
+                <div class="sg-recovery-review-summary-item"><dt>Severity</dt><dd id="sg-secops-alert-severity"></dd></div>
+                <div class="sg-recovery-review-summary-item"><dt>Status</dt><dd id="sg-secops-alert-status"></dd></div>
+                <div class="sg-recovery-review-summary-item"><dt>Rule</dt><dd id="sg-secops-alert-rule"></dd></div>
+                <div class="sg-recovery-review-summary-item" id="sg-secops-alert-ip-row" hidden><dt>Source IP</dt><dd id="sg-secops-alert-ip"></dd></div>
+                <div class="sg-recovery-review-summary-item" id="sg-secops-alert-inv-row" hidden><dt>Investigation</dt><dd id="sg-secops-alert-inv"></dd></div>
+            </dl>
+        </div>
+    </div>
+</dialog>
+
+<dialog class="sg-modal sg-secops-investigate-modal" id="sg-secops-investigate-modal" aria-labelledby="sg-secops-investigate-title">
+    <div class="sg-modal-card sg-secops-investigate-card">
+        <header class="sg-modal-header sg-modal-header--settings">
+            <div class="sg-modal-header-copy">
+                <h2 id="sg-secops-investigate-title">Investigate alert</h2>
+                <p class="sg-modal-subtitle" id="sg-secops-investigate-subtitle"></p>
+            </div>
+            <button class="sg-modal-close" type="button" data-secops-investigate-close aria-label="Close">
+                <vc:sg-icon name="close" />
+            </button>
+        </header>
+        <div class="sg-modal-scroll sg-secops-investigate-body">
+            <p class="sg-secops-investigate-lede" id="sg-secops-investigate-alert-line"></p>
+            <form method="post" asp-page-handler="SaveInvestigation" id="sg-secops-investigate-form" class="sg-secops-investigate-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="alertId" id="sg-secops-investigate-alert-id" value="" />
+                <partial name="_SecOpsRouteHiddens" model="Model" />
+                <div class="sg-field">
+                    <label class="sg-label" for="investigateStatus">Investigation status</label>
+                    <select class="sg-select" id="investigateStatus" name="investigateStatus">
+                        <option value="@InvestigationStatuses.Open">Open</option>
+                        <option value="@InvestigationStatuses.InProgress">In progress</option>
+                        <option value="@InvestigationStatuses.Closed">Closed</option>
+                    </select>
+                </div>
+                <div class="sg-field">
+                    <label class="sg-label" for="investigateNotes">Notes</label>
+                    <textarea class="sg-textarea" id="investigateNotes" name="investigateNotes" maxlength="2000" rows="6" placeholder="Document findings, actions taken, and next steps."></textarea>
+                    <p class="sg-help">Up to 2000 characters.</p>
+                </div>
+                <div class="sg-secops-modal-actions">
+                    <button class="sg-btn-secondary" type="button" data-secops-investigate-close>Cancel</button>
+                    <button class="sg-btn" type="submit" data-submit>Save investigation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script src="~/js/security-operations.js" asp-append-version="true"></script>
+}
